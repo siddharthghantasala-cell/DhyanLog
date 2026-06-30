@@ -67,8 +67,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           IconButton(
             tooltip: 'Log out',
             icon: const Icon(Icons.logout),
-            onPressed: () =>
-                ref.read(currentParticipantProvider.notifier).state = null,
+            onPressed: () => ref.read(authServiceProvider).signOut(),
           ),
         ],
       ),

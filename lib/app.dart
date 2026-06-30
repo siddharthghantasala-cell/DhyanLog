@@ -11,13 +11,37 @@ class DhyanLogApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final me = ref.watch(currentParticipantProvider);
+    final auth = ref.watch(authStateProvider);
+    final me = auth.valueOrNull?.participant;
     final theme = me == null ? AppTheme.neutral : AppTheme.forRole(me.role);
+
+    final Widget home;
+    if (auth.isLoading) {
+      // Restoring a persisted session — avoid a flash of the login screen.
+      home = const _SplashScreen();
+    } else {
+      home = me == null ? const LoginScreen() : const HomeScreen();
+    }
+
     return MaterialApp(
       title: 'DhyanLog',
       debugShowCheckedModeBanner: false,
       theme: theme,
-      home: me == null ? const LoginScreen() : const HomeScreen(),
+      home: home,
+    );
+  }
+}
+
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: Center(
+        child: Icon(Icons.self_improvement, size: 96, color: scheme.primary),
+      ),
     );
   }
 }
