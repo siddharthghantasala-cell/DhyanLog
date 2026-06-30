@@ -1,0 +1,27 @@
+# Supabase local/dev configuration. `project_id` is used as the local stack
+# name and as the link target name. Adjust before `supabase link`.
+project_id = "dhyanlog"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+# Real Heartfulness SSO is a future venture; no auth providers wired yet.
+
+# The single routed API function. JWT verification stays ON (the app sends the
+# anon key); the function itself uses the service-role key internally.
+[functions.api]
+verify_jwt = true
