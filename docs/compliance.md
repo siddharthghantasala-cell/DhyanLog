@@ -27,9 +27,16 @@ Pre-launch checklist for the official app. Items marked **(needs decision)** or
   and used on the server, and only a masked hint (`a***@domain`) is ever
   returned. Session restore uses `auth/me`, which returns *only the caller's own*
   record and requires a valid token. The old anon-readable `participant-lookup`
-  route has been removed. NOTE: `auth/request-otp` still confirms whether an ID
-  exists (it returns the masked hint), so member-ID enumeration is possible;
-  add rate limiting before public launch, and SSO removes this surface entirely.
+  route has been removed.
+- **OTP rate limiting is implemented** (`ratelimit.ts`): the public `auth/*`
+  routes are throttled per Heartfulness ID and per client IP via Upstash
+  fixed-window counters (429 + `Retry-After` when exceeded; fails open if Redis
+  is unavailable so it never blocks real sign-in). Per-ID caps are tight; per-IP
+  caps are generous so a shared venue/carrier NAT isn't locked out — **tune the
+  constants in `ratelimit.ts` per deployment**, and confirm them against the
+  venue-login pattern during the mass-event load test. `auth/request-otp` still
+  confirms an ID exists (the masked hint), so enumeration is slowed, not
+  eliminated; Heartfulness SSO removes this surface entirely.
 
 ## Reliability / scale (needs infra)
 

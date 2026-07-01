@@ -24,6 +24,7 @@ import {
   startSession,
 } from "./handlers.ts";
 import { me, requestOtp, verifyOtp } from "./otp.ts";
+import { otpRateLimitResponse } from "./ratelimit.ts";
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("Origin");
@@ -82,6 +83,12 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Throttle the public OTP routes (enumeration / send-spam / code brute-force)
+    // before doing any DB or GoTrue work.
+    if (path === "auth/request-otp" || path === "auth/verify-otp") {
+      const limited = await otpRateLimitResponse(req, path, body);
+      if (limited) return finish(limited, "rate_limited");
+    }
     switch (path) {
       case "auth/request-otp":
         return finish(await requestOtp(body));
