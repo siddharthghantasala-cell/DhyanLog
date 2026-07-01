@@ -42,12 +42,11 @@ The DB write is *not* the bottleneck — a 70k session is still one Postgres row
   provider incident mid-session, not ordinary restarts. Review persistence /
   eviction settings, set alerts on memory/evictions, and consider a periodic
   checkpoint of the attendee set to Postgres for very large sessions.
-- **Per-attend response amplification (code fix, not just budget):** every
-  `attend` currently returns the *entire* growing attendee list
-  (`joinAndRespond` -> `attendees()` SMEMBERS). At 70k that's ~O(n²) data movement
-  and multi-MB responses near the end. Abhyasi clients only need their own
-  join confirmation + a count — trim the response before a mass event. Money does
-  **not** fix this; it just makes the waste more expensive.
+- **Per-attend response amplification — FIXED.** `attend` used to return the
+  entire growing attendee list on every call (SMEMBERS), ~O(n²) at scale. Clients
+  now receive only `attendee_count` (Redis SCARD); the full id set is
+  materialized just once, at the meditation-stop flush. Keep it that way — never
+  add the id array back to a client-facing DTO.
 - **Upstash tier limits:** per-command count, bandwidth, and max request/response
   size. A 70k-member set is ~1–2 MB per SMEMBERS; repeated full reads can exceed
   free-tier caps. These are raised by upgrading the plan (easy), but fix the
