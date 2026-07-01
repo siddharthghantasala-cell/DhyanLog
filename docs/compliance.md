@@ -33,15 +33,50 @@ Pre-launch checklist for the official app. Items marked **(needs decision)** or
 
 ## Reliability / scale (needs infra)
 
+The DB write is *not* the bottleneck — a 70k session is still one Postgres row
+(`attendee_ids` array + count). The mass-event risks are:
+
 - **Redis durability:** the open session lives only in Upstash for its ~1h life;
-  a buffer loss mid-session loses the in-flight attendee set. Review Upstash
-  persistence/eviction settings and set alerts on memory/evictions for the prod
-  database before a mass event.
+  the in-flight attendee set has no durable copy until the meditation-stop flush.
+  Upstash is disk-backed, so the risk is eviction under memory pressure or a
+  provider incident mid-session, not ordinary restarts. Review persistence /
+  eviction settings, set alerts on memory/evictions, and consider a periodic
+  checkpoint of the attendee set to Postgres for very large sessions.
+- **Per-attend response amplification (code fix, not just budget):** every
+  `attend` currently returns the *entire* growing attendee list
+  (`joinAndRespond` -> `attendees()` SMEMBERS). At 70k that's ~O(n²) data movement
+  and multi-MB responses near the end. Abhyasi clients only need their own
+  join confirmation + a count — trim the response before a mass event. Money does
+  **not** fix this; it just makes the waste more expensive.
+- **Upstash tier limits:** per-command count, bandwidth, and max request/response
+  size. A 70k-member set is ~1–2 MB per SMEMBERS; repeated full reads can exceed
+  free-tier caps. These are raised by upgrading the plan (easy), but fix the
+  amplification above first so you're not paying to move data nobody uses.
 - **CORS:** set the `ALLOWED_ORIGINS` function secret to the real web origin(s)
   in prod (defaults to `*` only when unset — see `cors.ts`).
 - **Load test** the mass-event flush path against the 40k–70k+ target on staging
   before any real event — see `scripts/load-test/attend.js`. Watch the geo-bucket
   fan-out and the single-flush write; confirm free-tier limits hold or budget up.
+
+## Member availability & reach
+
+The backend is globally reachable and always-on; "can any member use it anywhere"
+is gated by these, not by the network:
+
+- **OTP delivery.** Login needs the code to reach the member's contact on file.
+  Email is globally reliable — prefer it. **Phone/SMS OTP is region-dependent**
+  (deliverability + cost vary by country/carrier and provider); don't rely on SMS
+  for international members without validating the SMS provider's coverage.
+- **App distribution is per-country.** App Store / Play Store availability is
+  chosen per territory at release. The **web build** works anywhere with the URL;
+  the **iOS target doesn't exist yet** (no iPhone app until it's created + signed
+  on macOS — see `docs/release.md`).
+- **Language.** Currently English-only (only the login screen is localized).
+  Members anywhere can use it, but non-English speakers hit a UX wall until the
+  i18n coverage is extended.
+- **Attendance is location-bound by design.** Sign-in/viewing works anywhere, but
+  *giving attendance* matches the member to a nearby active session by GPS (or a
+  session short-code/QR). This is intentional, not a limitation to "fix".
 
 ## Security review
 
