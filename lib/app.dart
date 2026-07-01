@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'l10n/app_localizations.dart';
 import 'state/providers.dart';
 import 'theme/app_theme.dart';
 import 'ui/home_screen.dart';
@@ -13,7 +14,7 @@ class DhyanLogApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authStateProvider);
     final me = auth.valueOrNull?.participant;
-    final theme = me == null ? AppTheme.neutral : AppTheme.forRole(me.role);
+    final seed = me == null ? AppTheme.neutralSeed : AppTheme.seedForRole(me.role);
 
     final Widget home;
     if (auth.isLoading) {
@@ -26,7 +27,11 @@ class DhyanLogApp extends ConsumerWidget {
     return MaterialApp(
       title: 'DhyanLog',
       debugShowCheckedModeBanner: false,
-      theme: theme,
+      theme: AppTheme.light(seed),
+      darkTheme: AppTheme.dark(seed),
+      themeMode: ThemeMode.system, // follows the device's light/dark setting
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: home,
     );
   }

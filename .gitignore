@@ -46,3 +46,7 @@ app.*.map.json
 
 # Local run helper (contains anon key)
 run_on_phone.ps1
+
+# Per-environment dart-define files (contain real keys). Only example.json is tracked.
+/config/*.json
+!/config/example.json

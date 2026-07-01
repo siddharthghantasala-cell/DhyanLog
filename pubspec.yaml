@@ -9,8 +9,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   flutter_riverpod: ^2.5.1
   http: ^1.2.0
+  intl: any
+  sentry_flutter: ^8.0.0
+  shared_preferences: ^2.2.0
   supabase_flutter: ^2.5.0
 
 dev_dependencies:
@@ -20,3 +25,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true # enables gen-l10n localization codegen (see l10n.yaml)

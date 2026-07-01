@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/meditation_center.dart';
 import '../models/participant.dart';
 import '../services/mock/seed_data.dart';
 import '../state/providers.dart';
 import 'abhyasi_attend_screen.dart';
+import 'error_presentation.dart';
 import 'preceptor_session_screen.dart';
 
 /// Landing screen after login. One large central action button whose meaning
@@ -22,6 +24,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // this is replaced by real GPS.
   late MeditationCenter _location = SeedData.centers.first;
   bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Opportunistically record any attendance that was queued while offline.
+    // Fire-and-forget; failures just leave items queued for next time.
+    Future(() => ref.read(attendQueueProvider).flush()).ignore();
+  }
 
   Future<void> _onPrimaryAction(Participant me) async {
     if (_busy) return;
@@ -48,8 +58,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ));
       }
+    } catch (e) {
+      if (mounted) showActionError(ref, context, e);
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Confirm, then permanently delete the app login. Org-owned membership and
+  /// attendance are left intact (see AuthService.deleteAccount). On success the
+  /// auth stream flips to signed-out and routing returns to the login screen.
+  Future<void> _confirmDeleteAccount() async {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.deleteAccountTitle),
+        content: Text(l10n.deleteAccountBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.commonCancel),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: scheme.error),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.deleteAccountConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ref.read(authServiceProvider).deleteAccount();
+    } catch (e) {
+      if (mounted) showActionError(ref, context, e);
     }
   }
 
@@ -57,6 +101,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final me = ref.watch(currentParticipantProvider);
     if (me == null) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
     final isLeader = me.role.canLead;
 
@@ -64,10 +109,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: Text(isLeader ? 'Preceptor' : 'Abhyasi'),
         actions: [
-          IconButton(
-            tooltip: 'Log out',
-            icon: const Icon(Icons.logout),
-            onPressed: () => ref.read(authServiceProvider).signOut(),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'logout':
+                  ref.read(authServiceProvider).signOut();
+                case 'delete':
+                  _confirmDeleteAccount();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'logout',
+                child: ListTile(
+                  leading: const Icon(Icons.logout),
+                  title: Text(l10n.homeLogOut),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: ListTile(
+                  leading: Icon(Icons.delete_forever, color: scheme.error),
+                  title: Text(
+                    l10n.homeDeleteAccount,
+                    style: TextStyle(color: scheme.error),
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
         ],
       ),

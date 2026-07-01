@@ -17,7 +17,11 @@ import 'supabase_auth_gateway.dart';
 /// All sign-in logic lives here against the [SupabaseAuthGateway] seam; the
 /// Supabase SDK is only touched by `SupabaseAuthGatewayImpl`.
 class SupabaseAuthService implements AuthService {
-  SupabaseAuthService(this._participants, this._gateway) {
+  SupabaseAuthService(
+    this._participants,
+    this._gateway, {
+    Future<void> Function()? deleteAccountOnBackend,
+  }) : _deleteAccountOnBackend = deleteAccountOnBackend {
     // Keep the session token fresh on refresh, and react to sign-out elsewhere.
     _tokenSub = _gateway.accessTokenChanges().listen((token) {
       if (token == null) {
@@ -34,6 +38,11 @@ class SupabaseAuthService implements AuthService {
 
   final ParticipantRepository _participants;
   final SupabaseAuthGateway _gateway;
+
+  /// Calls the service-role edge route that deletes the auth user (GoTrue admin
+  /// delete can't run client-side). Invoked while the JWT is still valid, before
+  /// sign-out. Null in tests / when no backend is wired.
+  final Future<void> Function()? _deleteAccountOnBackend;
   final StreamController<AuthSession?> _controller =
       StreamController<AuthSession?>.broadcast();
   StreamSubscription<String?>? _tokenSub;
@@ -126,6 +135,26 @@ class SupabaseAuthService implements AuthService {
     _pendingContact = null;
     _current = null;
     _controller.add(null);
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    // Delete the auth user server-side *first*, while the JWT is still valid;
+    // only sign out (invalidating the token) once that succeeds. If the backend
+    // call fails, surface it and leave the user signed in.
+    final delete = _deleteAccountOnBackend;
+    if (delete != null) {
+      try {
+        await delete();
+      } on AuthException {
+        rethrow;
+      } catch (_) {
+        throw const AuthException(
+          'Could not delete your account. Please try again.',
+        );
+      }
+    }
+    await signOut();
   }
 
   /// Release the token subscription. (Not called by the app today — the service

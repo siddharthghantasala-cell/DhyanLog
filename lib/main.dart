@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
@@ -17,5 +18,21 @@ Future<void> main() async {
       anonKey: AppConfig.supabaseAnonKey,
     );
   }
-  runApp(const ProviderScope(child: DhyanLogApp()));
+
+  void start() => runApp(const ProviderScope(child: DhyanLogApp()));
+
+  // With a DSN configured, run inside Sentry so uncaught Flutter + Dart errors
+  // are reported automatically; otherwise just start (telemetry is a no-op).
+  if (AppConfig.hasSentry) {
+    await SentryFlutter.init(
+      (options) {
+        options.dsn = AppConfig.sentryDsn;
+        options.environment = AppConfig.environment;
+        options.tracesSampleRate = 0.2;
+      },
+      appRunner: start,
+    );
+  } else {
+    start();
+  }
 }

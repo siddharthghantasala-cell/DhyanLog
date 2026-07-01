@@ -145,4 +145,45 @@ void main() {
     await auth.signOut();
     expect(auth.currentSession, isNull);
   });
+
+  group('SupabaseAuthService.deleteAccount', () {
+    test('calls the backend then signs out', () async {
+      var backendCalled = false;
+      final withDelete = SupabaseAuthService(
+        repo,
+        gateway,
+        deleteAccountOnBackend: () async {
+          backendCalled = true;
+        },
+      );
+      addTearDown(withDelete.dispose);
+
+      await withDelete.requestOtp('HFN-PREC-001');
+      await withDelete.verifyOtp('123456');
+      await withDelete.deleteAccount();
+
+      expect(backendCalled, isTrue);
+      expect(withDelete.currentSession, isNull);
+      expect(gateway.session, isNull); // gateway signed out too
+    });
+
+    test('backend failure surfaces as AuthException and keeps the session',
+        () async {
+      final withDelete = SupabaseAuthService(
+        repo,
+        gateway,
+        deleteAccountOnBackend: () async => throw Exception('500'),
+      );
+      addTearDown(withDelete.dispose);
+
+      await withDelete.requestOtp('HFN-PREC-001');
+      await withDelete.verifyOtp('123456');
+
+      await expectLater(
+        withDelete.deleteAccount(),
+        throwsA(isA<AuthException>()),
+      );
+      expect(withDelete.currentSession, isNotNull); // still signed in
+    });
+  });
 }

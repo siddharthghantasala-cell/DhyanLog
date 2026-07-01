@@ -39,11 +39,15 @@ class HttpAttendanceService implements AttendanceService {
     required double latitude,
     required double longitude,
   }) async {
-    final res = await _api.post('attend', {
-      'heartfulnessId': heartfulnessId,
-      'latitude': latitude,
-      'longitude': longitude,
-    });
+    final res = await _api.post(
+      'attend',
+      {
+        'heartfulnessId': heartfulnessId,
+        'latitude': latitude,
+        'longitude': longitude,
+      },
+      retryable: true, // idempotent (SADD)
+    );
     return _attendResult(res);
   }
 
@@ -52,10 +56,14 @@ class HttpAttendanceService implements AttendanceService {
     required String heartfulnessId,
     required String codeOrSessionId,
   }) async {
-    final res = await _api.post('attend', {
-      'heartfulnessId': heartfulnessId,
-      'code': codeOrSessionId,
-    });
+    final res = await _api.post(
+      'attend',
+      {
+        'heartfulnessId': heartfulnessId,
+        'code': codeOrSessionId,
+      },
+      retryable: true, // idempotent (SADD)
+    );
     return _attendResult(res);
   }
 
@@ -83,7 +91,11 @@ class HttpAttendanceService implements AttendanceService {
   @override
   Future<MeditationSession?> getSession(String sessionId) async {
     try {
-      final res = await _api.post('sessions/get', {'sessionId': sessionId});
+      final res = await _api.post(
+        'sessions/get',
+        {'sessionId': sessionId},
+        retryable: true, // read-only
+      );
       return _session(res);
     } on ApiException catch (e) {
       if (e.statusCode == 404) return null;
@@ -94,7 +106,21 @@ class HttpAttendanceService implements AttendanceService {
   @override
   Stream<MeditationSession> watchSession(String sessionId) async* {
     while (true) {
-      final session = await getSession(sessionId);
+      MeditationSession? session;
+      try {
+        session = await getSession(sessionId);
+      } on NetworkException {
+        // Transient: a live session shouldn't die on a momentary drop. Wait and
+        // keep polling. (getSession already retried internally first.)
+        await Future<void>.delayed(pollInterval);
+        continue;
+      } on ApiException catch (e) {
+        if (e.isServerError) {
+          await Future<void>.delayed(pollInterval);
+          continue;
+        }
+        rethrow; // auth/validation errors are not transient — surface them
+      }
       if (session == null) break;
       yield session;
       if (session.status == SessionStatus.ended) break;

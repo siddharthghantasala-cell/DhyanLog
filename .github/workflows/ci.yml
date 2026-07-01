@@ -1,0 +1,39 @@
+name: CI
+
+# Lints and tests every PR and every push to main. Merges should be gated on
+# this workflow passing (configure branch protection in the repo settings).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  flutter:
+    name: Flutter analyze & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter --version
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      # Compile-check the web target (catches integration breaks unit tests miss).
+      - run: flutter build web --no-tree-shake-icons
+
+  edge-function:
+    name: Edge function check, fmt & test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: supabase/functions/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno fmt --check .
+      - run: deno check index.ts
+      - run: deno test --allow-net --allow-env

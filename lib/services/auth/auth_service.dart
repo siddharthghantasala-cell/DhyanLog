@@ -52,4 +52,11 @@ abstract class AuthService {
 
   /// End the session and clear any persisted tokens.
   Future<void> signOut();
+
+  /// Permanently delete the app login (the Supabase Auth account) and sign out.
+  /// The member's org record and historical attendance are org-owned data and
+  /// are deliberately left intact. Satisfies the app stores' in-app
+  /// account-deletion requirement. Throws [AuthException] if the deletion could
+  /// not be completed (the caller should keep the user signed in in that case).
+  Future<void> deleteAccount();
 }

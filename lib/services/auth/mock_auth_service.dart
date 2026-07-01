@@ -71,4 +71,10 @@ class MockAuthService implements AuthService {
     _current = null;
     _controller.add(null);
   }
+
+  @override
+  Future<void> deleteAccount() async {
+    // No backend in the mock: deleting the login is just signing out.
+    await signOut();
+  }
 }

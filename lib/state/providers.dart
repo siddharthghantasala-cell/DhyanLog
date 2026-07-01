@@ -14,7 +14,17 @@ import '../services/http/http_attendance_service.dart';
 import '../services/http/http_participant_repository.dart';
 import '../services/mock/mock_attendance_service.dart';
 import '../services/mock/mock_participant_repository.dart';
+import '../services/observability/sentry_telemetry.dart';
+import '../services/observability/telemetry.dart';
+import '../services/offline/attend_queue.dart';
+import '../services/offline/prefs_queue_storage.dart';
 import '../services/participant_repository.dart';
+
+/// Crash/error reporting seam. Sentry when a DSN is configured (see main.dart),
+/// otherwise a no-op — so the app builds and runs with no external service.
+final Provider<Telemetry> telemetryProvider = Provider<Telemetry>((ref) {
+  return AppConfig.hasSentry ? const SentryTelemetry() : const NoopTelemetry();
+});
 
 /// Shared HTTP client for the real backend (only constructed when configured).
 /// Sends the signed-in user's JWT when present (read fresh at call time) so
@@ -47,6 +57,15 @@ final attendanceServiceProvider = Provider<AttendanceService>((ref) {
   return MockAttendanceService();
 });
 
+/// Offline attendance queue: holds attend attempts made while offline and
+/// retries them when connectivity returns (safe — attendance is idempotent).
+final attendQueueProvider = Provider<AttendQueue>((ref) {
+  return AttendQueue(
+    ref.read(attendanceServiceProvider),
+    PrefsQueueStorage(),
+  );
+});
+
 /// Authentication seam. Mock identity now; Supabase Auth (interim) then
 /// Heartfulness SSO swap in here with no change to the screens, the same way
 /// the service providers above swap mock↔real.
@@ -55,6 +74,10 @@ final Provider<AuthService> authServiceProvider = Provider<AuthService>((ref) {
     return SupabaseAuthService(
       ref.read(participantRepositoryProvider),
       SupabaseAuthGatewayImpl(Supabase.instance.client.auth),
+      // Service-role delete of the auth user runs on the edge function, called
+      // with the still-valid JWT before sign-out. Not retryable (a delete).
+      deleteAccountOnBackend: () =>
+          ref.read(apiClientProvider).post('account/delete', const {}),
     );
   }
   return MockAuthService(ref.read(participantRepositoryProvider));

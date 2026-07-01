@@ -1,14 +1,15 @@
-import { createClient, SupabaseClient } from "./deps.ts";
+import { type AuditAction, recordAudit } from "./audit.ts";
+import { type Member } from "./auth.ts";
 import { Buffer, SessionMeta } from "./buffer.ts";
 import { json } from "./cors.ts";
-
-function db(): SupabaseClient {
-  return createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    { auth: { persistSession: false } },
-  );
-}
+import { db } from "./db.ts";
+import {
+  cleanString,
+  optionalString,
+  validLatitude,
+  validLongitude,
+  validShortCode,
+} from "./validation.ts";
 
 function generateId(): string {
   return `sess_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`;
@@ -18,6 +19,37 @@ function generateCode(): string {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
+}
+
+/// A preceptor controls only their own session; a master may manage any.
+function ownsSession(meta: SessionMeta, member: Member): boolean {
+  return meta.preceptorId === member.heartfulnessId || member.role === "master";
+}
+
+/// Append an audit row, best-effort: a failure here must never break the user's
+/// action, so we log it and move on rather than throw.
+async function audit(
+  member: Member,
+  action: AuditAction,
+  sessionId?: string,
+  detail?: Record<string, unknown>,
+): Promise<void> {
+  const err = await recordAudit(db(), {
+    actorHeartfulnessId: member.heartfulnessId,
+    action,
+    sessionId,
+    detail,
+  });
+  if (err) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        msg: "audit_failed",
+        action,
+        error: err,
+      }),
+    );
+  }
 }
 
 /// Snake_case DTO matching the Flutter MeditationSession.fromJson contract.
@@ -39,7 +71,7 @@ function sessionDto(meta: SessionMeta, attendeeIds: string[]) {
 }
 
 export async function lookupParticipant(body: any): Promise<Response> {
-  const id = (body.heartfulnessId ?? "").toString().trim();
+  const id = cleanString(body.heartfulnessId, 128);
   if (!id) return json({ error: "heartfulnessId required" }, 400);
   const { data, error } = await db()
     .from("participants")
@@ -54,17 +86,20 @@ export async function lookupParticipant(body: any): Promise<Response> {
 export async function startSession(
   buffer: Buffer,
   body: any,
+  member: Member,
 ): Promise<Response> {
-  const { preceptorId, centerId, latitude, longitude } = body;
-  if (!preceptorId || latitude == null || longitude == null) {
-    return json({ error: "preceptorId, latitude, longitude required" }, 400);
+  if (!validLatitude(body.latitude) || !validLongitude(body.longitude)) {
+    return json({ error: "valid latitude and longitude required" }, 400);
   }
+  const centerId = optionalString(body.centerId, 64);
+  if (centerId === null) return json({ error: "invalid centerId" }, 400);
+
   const meta: SessionMeta = {
     id: generateId(),
-    preceptorId,
+    preceptorId: member.heartfulnessId, // from the verified token, not the body
     centerId: centerId ?? null,
-    latitude,
-    longitude,
+    latitude: body.latitude,
+    longitude: body.longitude,
     startAttendanceAt: new Date().toISOString(),
     meditationStartAt: null,
     meditationEndAt: null,
@@ -73,16 +108,22 @@ export async function startSession(
     frozen: false,
   };
   await buffer.createSession(meta);
+  await audit(member, "session_start", meta.id);
   return json(sessionDto(meta, []));
 }
 
-export async function attend(buffer: Buffer, body: any): Promise<Response> {
-  const heartfulnessId = (body.heartfulnessId ?? "").toString().trim();
-  if (!heartfulnessId) return json({ error: "heartfulnessId required" }, 400);
+export async function attend(
+  buffer: Buffer,
+  body: any,
+  member: Member,
+): Promise<Response> {
+  const heartfulnessId = member.heartfulnessId; // from the verified token
 
   // Code / QR fallback path.
-  if (body.code) {
-    const id = await buffer.resolveCode(body.code.toString());
+  if (body.code != null) {
+    const code = validShortCode(body.code);
+    if (!code) return json({ error: "invalid code" }, 400);
+    const id = await buffer.resolveCode(code);
     const meta = id ? await buffer.getMeta(id) : null;
     if (!meta || meta.frozen || meta.status !== "collecting") {
       return json({ outcome: "notFound" });
@@ -91,8 +132,8 @@ export async function attend(buffer: Buffer, body: any): Promise<Response> {
   }
 
   // GPS path.
-  if (body.latitude == null || body.longitude == null) {
-    return json({ error: "latitude/longitude or code required" }, 400);
+  if (!validLatitude(body.latitude) || !validLongitude(body.longitude)) {
+    return json({ error: "valid latitude/longitude or code required" }, 400);
   }
   const nearby = await buffer.findNearby(body.latitude, body.longitude);
   if (nearby.length === 0) return json({ outcome: "notFound" });
@@ -118,40 +159,50 @@ async function joinAndRespond(
   });
 }
 
-async function mutateMeta(
+/// Fetch the session and confirm the caller owns it, or return an error
+/// Response. Returns the live meta on success.
+async function ownedSession(
   buffer: Buffer,
-  sessionId: string,
-  fn: (m: SessionMeta) => SessionMeta,
-): Promise<SessionMeta | null> {
+  body: any,
+  member: Member,
+): Promise<SessionMeta | Response> {
+  const sessionId = cleanString(body.sessionId, 128);
+  if (!sessionId) return json({ error: "sessionId required" }, 400);
   const meta = await buffer.getMeta(sessionId);
-  if (!meta) return null;
-  const updated = fn(meta);
-  await buffer.putMeta(updated);
-  return updated;
+  if (!meta) return json({ error: "session not active" }, 404);
+  if (!ownsSession(meta, member)) {
+    return json({ error: "not your session" }, 403);
+  }
+  return meta;
 }
 
 export async function endAttendance(
   buffer: Buffer,
   body: any,
+  member: Member,
 ): Promise<Response> {
-  const updated = await mutateMeta(buffer, body.sessionId, (m) => ({
-    ...m,
-    frozen: true,
-  }));
-  if (!updated) return json({ error: "session not active" }, 404);
+  const meta = await ownedSession(buffer, body, member);
+  if (meta instanceof Response) return meta;
+  const updated: SessionMeta = { ...meta, frozen: true };
+  await buffer.putMeta(updated);
+  await audit(member, "end_attendance", updated.id);
   return json(sessionDto(updated, await buffer.attendees(updated.id)));
 }
 
 export async function meditationStart(
   buffer: Buffer,
   body: any,
+  member: Member,
 ): Promise<Response> {
-  const updated = await mutateMeta(buffer, body.sessionId, (m) => ({
-    ...m,
+  const meta = await ownedSession(buffer, body, member);
+  if (meta instanceof Response) return meta;
+  const updated: SessionMeta = {
+    ...meta,
     status: "meditating",
     meditationStartAt: new Date().toISOString(),
-  }));
-  if (!updated) return json({ error: "session not active" }, 404);
+  };
+  await buffer.putMeta(updated);
+  await audit(member, "meditation_start", updated.id);
   return json(sessionDto(updated, await buffer.attendees(updated.id)));
 }
 
@@ -159,12 +210,13 @@ export async function meditationStart(
 export async function meditationStop(
   buffer: Buffer,
   body: any,
+  member: Member,
 ): Promise<Response> {
-  const meta = await buffer.getMeta(body.sessionId);
-  if (!meta) return json({ error: "session not active" }, 404);
-  const attendees = await buffer.attendees(meta.id);
+  const owned = await ownedSession(buffer, body, member);
+  if (owned instanceof Response) return owned;
+  const attendees = await buffer.attendees(owned.id);
   const finalized: SessionMeta = {
-    ...meta,
+    ...owned,
     status: "ended",
     meditationEndAt: new Date().toISOString(),
   };
@@ -186,11 +238,32 @@ export async function meditationStop(
   if (error) return json({ error: error.message }, 500);
 
   await buffer.evict(finalized);
+  await audit(member, "meditation_stop", finalized.id, {
+    attendee_count: attendees.length,
+  });
   return json(sessionDto(finalized, attendees));
 }
 
+/// Delete the caller's *app login only*: the Supabase Auth (GoTrue) user, keyed
+/// by the verified `sub` claim. The member's org record and historical
+/// attendance are org-owned data and are deliberately left intact (decided with
+/// the product owner; see docs/privacy.md retention). Satisfies the app stores'
+/// in-app account-deletion requirement. Best-effort audit, keyed off the member.
+export async function deleteAccount(
+  authUserId: string,
+  member: Member,
+): Promise<Response> {
+  const { error } = await db().auth.admin.deleteUser(authUserId);
+  if (error) return json({ error: error.message }, 500);
+  await audit(member, "account_delete", undefined, {
+    auth_user_id: authUserId,
+  });
+  return json({ deleted: true });
+}
+
 export async function getSession(buffer: Buffer, body: any): Promise<Response> {
-  const id = body.sessionId;
+  const id = cleanString(body.sessionId, 128);
+  if (!id) return json({ error: "sessionId required" }, 400);
   const meta = await buffer.getMeta(id);
   if (meta) {
     return json(sessionDto(meta, await buffer.attendees(id)));

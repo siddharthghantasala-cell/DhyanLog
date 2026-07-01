@@ -9,8 +9,11 @@ class HttpParticipantRepository implements ParticipantRepository {
 
   @override
   Future<Participant?> findByHeartfulnessId(String heartfulnessId) async {
-    final res =
-        await _api.post('participant-lookup', {'heartfulnessId': heartfulnessId});
+    final res = await _api.post(
+      'participant-lookup',
+      {'heartfulnessId': heartfulnessId},
+      retryable: true, // read-only
+    );
     final participant = res['participant'];
     if (participant == null) return null;
     return Participant.fromJson((participant as Map).cast<String, dynamic>());

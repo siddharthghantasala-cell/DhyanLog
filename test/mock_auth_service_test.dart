@@ -74,6 +74,15 @@ void main() {
     test('mock does not persist: restoreSession returns null', () async {
       expect(await auth.restoreSession(), isNull);
     });
+
+    test('deleteAccount signs the user out', () async {
+      await auth.requestOtp('HFN-PREC-001');
+      await auth.verifyOtp('123456');
+      expect(auth.currentSession, isNotNull);
+
+      await auth.deleteAccount();
+      expect(auth.currentSession, isNull);
+    });
   });
 
   group('maskContact', () {

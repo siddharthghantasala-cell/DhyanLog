@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/meditation_session.dart';
 import '../state/providers.dart';
+import 'error_presentation.dart';
 
 /// Live session control for the preceptor:
 ///   collecting -> [End Attendance] -> [Start Meditation] -> [Stop Meditation]
@@ -26,12 +27,25 @@ class _PreceptorSessionScreenState
   bool _busy = false;
   Timer? _ticker;
 
+  /// The live session stream, created once (not on every ticker rebuild) so the
+  /// poll loop isn't torn down and recreated each second.
+  late Stream<MeditationSession> _sessionStream;
+
   @override
   void initState() {
     super.initState();
+    _sessionStream =
+        ref.read(attendanceServiceProvider).watchSession(widget.sessionId);
     // Drives the live meditation-duration display.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
+    });
+  }
+
+  void _resubscribe() {
+    setState(() {
+      _sessionStream =
+          ref.read(attendanceServiceProvider).watchSession(widget.sessionId);
     });
   }
 
@@ -46,6 +60,8 @@ class _PreceptorSessionScreenState
     setState(() => _busy = true);
     try {
       await action();
+    } catch (e) {
+      if (mounted) showActionError(ref, context, e);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -60,8 +76,20 @@ class _PreceptorSessionScreenState
       appBar: AppBar(title: const Text('Session')),
       body: SafeArea(
         child: StreamBuilder<MeditationSession>(
-          stream: service.watchSession(widget.sessionId),
+          stream: _sessionStream,
           builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              if (isAuthError(snapshot.error!)) {
+                ref.read(authServiceProvider).signOut();
+              }
+              return Padding(
+                padding: const EdgeInsets.all(24),
+                child: ErrorRetry(
+                  error: snapshot.error!,
+                  onRetry: _resubscribe,
+                ),
+              );
+            }
             final session = snapshot.data;
             if (session == null) {
               return const Center(child: CircularProgressIndicator());

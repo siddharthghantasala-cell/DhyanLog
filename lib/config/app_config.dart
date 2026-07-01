@@ -14,4 +14,15 @@ class AppConfig {
       supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
 
   static String get apiBaseUrl => '$supabaseUrl/functions/v1/api';
+
+  /// Sentry DSN for crash/error reporting. When empty (default), telemetry is a
+  /// no-op — the app builds and runs with no external reporting configured.
+  static const String sentryDsn = String.fromEnvironment('SENTRY_DSN');
+
+  static bool get hasSentry => sentryDsn.isNotEmpty;
+
+  /// Deploy environment tag attached to telemetry (dev/staging/prod). Defaults
+  /// to 'dev' so local runs are distinguishable from real environments.
+  static const String environment =
+      String.fromEnvironment('APP_ENV', defaultValue: 'dev');
 }

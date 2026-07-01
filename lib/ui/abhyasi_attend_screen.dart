@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/attend_result.dart';
+import '../models/pending_attend.dart';
+import '../services/http/api_client.dart';
 import '../state/providers.dart';
+import 'error_presentation.dart';
 
 /// Abhyasi "give attendance" flow: try GPS match first, fall back to a typed
 /// short code / scanned link when the match is ambiguous or empty.
@@ -25,6 +28,11 @@ class _AbhyasiAttendScreenState extends ConsumerState<AbhyasiAttendScreen> {
   final _codeController = TextEditingController();
   bool _loading = true;
   AttendResult? _result;
+  Object? _error;
+  bool _queuedOffline = false;
+
+  /// Re-run whichever attempt the user is on (GPS, or the last typed code).
+  late VoidCallback _lastAttempt = _tryGps;
 
   @override
   void initState() {
@@ -41,32 +49,87 @@ class _AbhyasiAttendScreenState extends ConsumerState<AbhyasiAttendScreen> {
   String get _myId => ref.read(currentParticipantProvider)!.heartfulnessId;
 
   Future<void> _tryGps() async {
-    setState(() => _loading = true);
-    final service = ref.read(attendanceServiceProvider);
-    final result = await service.attendByLocation(
-      heartfulnessId: _myId,
-      latitude: widget.latitude,
-      longitude: widget.longitude,
-    );
-    if (!mounted) return;
+    _lastAttempt = _tryGps;
     setState(() {
-      _loading = false;
-      _result = result;
+      _loading = true;
+      _error = null;
     });
+    try {
+      final result = await ref.read(attendanceServiceProvider).attendByLocation(
+            heartfulnessId: _myId,
+            latitude: widget.latitude,
+            longitude: widget.longitude,
+          );
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _result = result;
+      });
+    } on NetworkException {
+      await _queueOffline(PendingAttend(
+        id: _newId(),
+        heartfulnessId: _myId,
+        latitude: widget.latitude,
+        longitude: widget.longitude,
+        queuedAt: DateTime.now(),
+      ));
+    } catch (e) {
+      _onError(e);
+    }
   }
 
   Future<void> _tryCode([String? code]) async {
     final value = (code ?? _codeController.text).trim();
     if (value.isEmpty) return;
-    setState(() => _loading = true);
-    final service = ref.read(attendanceServiceProvider);
-    final result =
-        await service.attendByCode(heartfulnessId: _myId, codeOrSessionId: value);
+    _lastAttempt = () => _tryCode(value);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await ref.read(attendanceServiceProvider).attendByCode(
+            heartfulnessId: _myId,
+            codeOrSessionId: value,
+          );
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _result = result;
+      });
+    } on NetworkException {
+      await _queueOffline(PendingAttend(
+        id: _newId(),
+        heartfulnessId: _myId,
+        code: value,
+        queuedAt: DateTime.now(),
+      ));
+    } catch (e) {
+      _onError(e);
+    }
+  }
+
+  String _newId() =>
+      '${DateTime.now().microsecondsSinceEpoch}-${_myId.hashCode}';
+
+  /// Offline: hold the attempt locally; it records automatically when back online.
+  Future<void> _queueOffline(PendingAttend item) async {
+    await ref.read(attendQueueProvider).enqueue(item);
     if (!mounted) return;
     setState(() {
       _loading = false;
-      _result = result;
+      _queuedOffline = true;
     });
+  }
+
+  void _onError(Object error) {
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _error = error;
+    });
+    if (isAuthError(error)) {
+      ref.read(authServiceProvider).signOut();
+    }
   }
 
   @override
@@ -78,8 +141,26 @@ class _AbhyasiAttendScreenState extends ConsumerState<AbhyasiAttendScreen> {
           padding: const EdgeInsets.all(24),
           child: _loading
               ? const Center(child: CircularProgressIndicator())
-              : _buildResult(context),
+              : _queuedOffline
+                  ? _buildQueued(context)
+                  : _error != null
+                      ? ErrorRetry(error: _error!, onRetry: _lastAttempt)
+                      : _buildResult(context),
         ),
+      ),
+    );
+  }
+
+  Widget _buildQueued(BuildContext context) {
+    return _Centered(
+      icon: Icons.cloud_off,
+      color: Colors.blueGrey,
+      title: 'Saved offline',
+      message: "You're offline, so we saved your attendance. It will be "
+          'recorded automatically when your connection returns.',
+      action: FilledButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Done'),
       ),
     );
   }

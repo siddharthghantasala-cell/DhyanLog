@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/auth/auth_service.dart';
 import '../state/providers.dart';
+import '../theme/tokens.dart';
 
 /// Two-step sign-in: enter Heartfulness ID -> receive a one-time code at the
 /// contact on file -> verify. No matching member means no entry.
@@ -31,9 +33,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _sendCode() async {
+    final l10n = AppLocalizations.of(context)!;
     final id = _idController.text.trim();
     if (id.isEmpty) {
-      setState(() => _error = 'Enter your Heartfulness ID');
+      setState(() => _error = l10n.loginEnterId);
       return;
     }
     setState(() {
@@ -50,14 +53,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on AuthException catch (e) {
       _showError(e.message);
     } catch (_) {
-      _showError('Something went wrong. Please try again.');
+      _showError(l10n.commonSomethingWrong);
     }
   }
 
   Future<void> _verify() async {
+    final l10n = AppLocalizations.of(context)!;
     final code = _codeController.text.trim();
     if (code.isEmpty) {
-      setState(() => _error = 'Enter the code you received');
+      setState(() => _error = l10n.loginEnterCode);
       return;
     }
     setState(() {
@@ -71,7 +75,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } on AuthException catch (e) {
       _showError(e.message);
     } catch (_) {
-      _showError('Something went wrong. Please try again.');
+      _showError(l10n.commonSomethingWrong);
     }
   }
 
@@ -94,34 +98,42 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     final onChallenge = _challenge != null;
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Icon(Icons.self_improvement, size: 96, color: scheme.primary),
-                const SizedBox(height: 16),
-                Text(
-                  'DhyanLog',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Meditation attendance',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                ),
-                const SizedBox(height: 40),
-                if (!onChallenge) ..._buildIdStep(context) else ..._buildCodeStep(context),
-              ],
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: ConstrainedBox(
+              constraints:
+                  const BoxConstraints(maxWidth: AppSpacing.maxContentWidth),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Icon(Icons.self_improvement, size: 96, color: scheme.primary),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    l10n.appTitle,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    l10n.appTagline,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  if (!onChallenge)
+                    ..._buildIdStep(context, l10n)
+                  else
+                    ..._buildCodeStep(context, l10n),
+                ],
+              ),
             ),
           ),
         ),
@@ -129,7 +141,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  List<Widget> _buildIdStep(BuildContext context) {
+  List<Widget> _buildIdStep(BuildContext context, AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     return [
       TextField(
@@ -137,23 +149,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         textInputAction: TextInputAction.go,
         onSubmitted: (_) => _sendCode(),
         decoration: InputDecoration(
-          labelText: 'Heartfulness ID',
-          hintText: 'e.g. HFN-ABHY-001',
+          labelText: l10n.loginIdLabel,
+          hintText: l10n.loginIdHint,
           border: const OutlineInputBorder(),
           errorText: _error,
           prefixIcon: const Icon(Icons.badge_outlined),
         ),
       ),
-      const SizedBox(height: 20),
+      const SizedBox(height: AppSpacing.lg),
       FilledButton(
         onPressed: _loading ? null : _sendCode,
-        child: _loading ? const _Spinner() : const Text('Send code'),
+        child: _loading ? const _Spinner() : Text(l10n.loginSendCode),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.sm),
       Text(
-        'We send a one-time code to the email or phone on your Heartfulness '
-        'record. Try a seeded ID such as HFN-PREC-001 (preceptor) or '
-        'HFN-ABHY-001 (abhyasi).',
+        l10n.loginHelp,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: scheme.onSurfaceVariant,
@@ -162,17 +172,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ];
   }
 
-  List<Widget> _buildCodeStep(BuildContext context) {
+  List<Widget> _buildCodeStep(BuildContext context, AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     return [
       Text(
-        'Enter the 6-digit code sent to ${_challenge!.maskedDestination}.',
+        l10n.loginCodeSentTo(_challenge!.maskedDestination),
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: scheme.onSurfaceVariant,
             ),
       ),
-      const SizedBox(height: 20),
+      const SizedBox(height: AppSpacing.lg),
       TextField(
         controller: _codeController,
         textInputAction: TextInputAction.go,
@@ -181,7 +191,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         onSubmitted: (_) => _verify(),
         decoration: InputDecoration(
-          labelText: 'Code',
+          labelText: l10n.loginCodeLabel,
           hintText: '123456',
           border: const OutlineInputBorder(),
           errorText: _error,
@@ -189,15 +199,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           prefixIcon: const Icon(Icons.lock_outline),
         ),
       ),
-      const SizedBox(height: 20),
+      const SizedBox(height: AppSpacing.lg),
       FilledButton(
         onPressed: _loading ? null : _verify,
-        child: _loading ? const _Spinner() : const Text('Verify'),
+        child: _loading ? const _Spinner() : Text(l10n.loginVerify),
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: AppSpacing.sm),
       TextButton(
         onPressed: _loading ? null : _changeId,
-        child: const Text('Use a different ID'),
+        child: Text(l10n.loginUseDifferentId),
       ),
     ];
   }
