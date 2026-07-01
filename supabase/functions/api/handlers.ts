@@ -1,6 +1,11 @@
 import { type AuditAction, recordAudit } from "./audit.ts";
 import { type Member } from "./auth.ts";
 import { Buffer, SessionMeta } from "./buffer.ts";
+import {
+  deleteCheckpoint,
+  readCheckpoint,
+  writeCheckpoint,
+} from "./checkpoint.ts";
 import { json } from "./cors.ts";
 import { db } from "./db.ts";
 import {
@@ -46,6 +51,26 @@ async function audit(
         level: "error",
         msg: "audit_failed",
         action,
+        error: err,
+      }),
+    );
+  }
+}
+
+/// Write a durability checkpoint, best-effort: a failure here must not break the
+/// preceptor's action, so we log it and move on (the buffer is still the live
+/// source of truth; the checkpoint only matters if the buffer is later lost).
+async function checkpoint(
+  meta: SessionMeta,
+  attendees: string[],
+): Promise<void> {
+  const err = await writeCheckpoint(db(), meta, attendees);
+  if (err) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        msg: "checkpoint_failed",
+        session: meta.id,
         error: err,
       }),
     );
@@ -175,8 +200,12 @@ export async function endAttendance(
   if (meta instanceof Response) return meta;
   const updated: SessionMeta = { ...meta, frozen: true };
   await buffer.putMeta(updated);
+  // The attendee set is now frozen — snapshot it to Postgres so a buffer loss
+  // during the meditation phase doesn't lose it. One SMEMBERS, once per session.
+  const attendees = await buffer.attendees(updated.id);
+  await checkpoint(updated, attendees);
   await audit(member, "end_attendance", updated.id);
-  return json(sessionDto(updated, await buffer.count(updated.id)));
+  return json(sessionDto(updated, attendees.length));
 }
 
 export async function meditationStart(
@@ -192,23 +221,44 @@ export async function meditationStart(
     meditationStartAt: new Date().toISOString(),
   };
   await buffer.putMeta(updated);
+  // Refresh the checkpoint with the meditation-start time, right before the long
+  // meditation window where a buffer loss would be unrecoverable otherwise.
+  const attendees = await buffer.attendees(updated.id);
+  await checkpoint(updated, attendees);
   await audit(member, "meditation_start", updated.id);
-  return json(sessionDto(updated, await buffer.count(updated.id)));
+  return json(sessionDto(updated, attendees.length));
 }
 
 /// The single flush: finalize, write ONE Postgres row, evict from the buffer.
+/// Recovers from the durability checkpoint if the buffer lost the session, so a
+/// mid-meditation Redis eviction can't strand an in-flight attendee set.
 export async function meditationStop(
   buffer: Buffer,
   body: any,
   member: Member,
 ): Promise<Response> {
-  const owned = await ownedSession(buffer, body, member);
-  if (owned instanceof Response) return owned;
-  // The one place the full attendee set is materialized: the single flush that
-  // writes it to Postgres. Everywhere else uses SCARD (count only).
-  const attendees = await buffer.attendees(owned.id);
+  const sessionId = cleanString(body.sessionId, 128);
+  if (!sessionId) return json({ error: "sessionId required" }, 400);
+
+  // Prefer the live buffer; fall back to the checkpoint if it was evicted.
+  let source = await buffer.getMeta(sessionId);
+  let attendees: string[];
+  const fromBuffer = source !== null;
+  if (source) {
+    // The one place the full set is materialized on the happy path.
+    attendees = await buffer.attendees(sessionId);
+  } else {
+    const recovered = await readCheckpoint(db(), sessionId);
+    if (!recovered) return json({ error: "session not active" }, 404);
+    source = recovered.meta;
+    attendees = recovered.attendees;
+  }
+  if (!ownsSession(source, member)) {
+    return json({ error: "not your session" }, 403);
+  }
+
   const finalized: SessionMeta = {
-    ...owned,
+    ...source,
     status: "ended",
     meditationEndAt: new Date().toISOString(),
   };
@@ -229,9 +279,11 @@ export async function meditationStop(
   });
   if (error) return json({ error: error.message }, 500);
 
-  await buffer.evict(finalized);
+  if (fromBuffer) await buffer.evict(finalized);
+  await deleteCheckpoint(db(), finalized.id);
   await audit(member, "meditation_stop", finalized.id, {
     attendee_count: attendees.length,
+    recovered: !fromBuffer,
   });
   return json(sessionDto(finalized, attendees.length));
 }
