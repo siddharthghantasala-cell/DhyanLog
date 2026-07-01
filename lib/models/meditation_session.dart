@@ -15,9 +15,11 @@ enum SessionStatus {
 }
 
 /// A meditation session — this single object is both the live "buffer packet"
-/// (while open) and the finalized record (once ended). The attendee list is
-/// stored as an array of heartfulness IDs plus a count, deliberately NOT one
-/// row per attendee, so a 70k-person mass event is still a single write.
+/// (while open) and the finalized record (once ended). The attendee *identities*
+/// live only in the hot buffer (Redis) and are written once, as an
+/// `attendee_ids` array, at the flush; clients only ever need the running
+/// [attendeeCount], so this model deliberately carries the count, not the list.
+/// (Sending the full list on every attend would be O(n²) at mass-event scale.)
 class MeditationSession {
   const MeditationSession({
     required this.id,
@@ -29,7 +31,7 @@ class MeditationSession {
     required this.meditationStartAt,
     required this.meditationEndAt,
     required this.status,
-    required this.attendeeIds,
+    required this.attendeeCount,
     required this.shortCode,
   });
 
@@ -43,13 +45,12 @@ class MeditationSession {
   final DateTime? meditationEndAt;
   final SessionStatus status;
 
-  /// Heartfulness IDs of attendees. De-duplicated (set semantics).
-  final List<String> attendeeIds;
+  /// Number of de-duplicated attendees so far. The identities themselves are not
+  /// sent to clients — only this count.
+  final int attendeeCount;
 
   /// Short human-readable code read out / shown for fallback joins.
   final String shortCode;
-
-  int get attendeeCount => attendeeIds.length;
 
   /// Payload encoded into the preceptor's QR code for scan-to-join.
   String get qrPayload => 'dhyanlog://attend?session=$id';
@@ -58,7 +59,7 @@ class MeditationSession {
     DateTime? meditationStartAt,
     DateTime? meditationEndAt,
     SessionStatus? status,
-    List<String>? attendeeIds,
+    int? attendeeCount,
   }) {
     return MeditationSession(
       id: id,
@@ -70,12 +71,17 @@ class MeditationSession {
       meditationStartAt: meditationStartAt ?? this.meditationStartAt,
       meditationEndAt: meditationEndAt ?? this.meditationEndAt,
       status: status ?? this.status,
-      attendeeIds: attendeeIds ?? this.attendeeIds,
+      attendeeCount: attendeeCount ?? this.attendeeCount,
       shortCode: shortCode,
     );
   }
 
   factory MeditationSession.fromJson(Map<String, dynamic> json) {
+    // Prefer the explicit count; fall back to an array length only if a legacy
+    // payload still carries `attendee_ids`.
+    final count = (json['attendee_count'] as num?)?.toInt() ??
+        (json['attendee_ids'] as List<dynamic>?)?.length ??
+        0;
     return MeditationSession(
       id: json['id'] as String,
       preceptorId: json['preceptor_id'] as String,
@@ -90,8 +96,7 @@ class MeditationSession {
           ? null
           : DateTime.parse(json['meditation_end_at'] as String),
       status: SessionStatus.fromString(json['status'] as String? ?? 'collecting'),
-      attendeeIds:
-          (json['attendee_ids'] as List<dynamic>? ?? const []).cast<String>(),
+      attendeeCount: count,
       shortCode: json['short_code'] as String? ?? '',
     );
   }
@@ -107,7 +112,6 @@ class MeditationSession {
       'meditation_start_at': meditationStartAt?.toIso8601String(),
       'meditation_end_at': meditationEndAt?.toIso8601String(),
       'status': status.name,
-      'attendee_ids': attendeeIds,
       'attendee_count': attendeeCount,
       'short_code': shortCode,
     };

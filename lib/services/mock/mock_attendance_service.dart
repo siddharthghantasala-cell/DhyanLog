@@ -28,6 +28,10 @@ class MockAttendanceService implements AttendanceService {
   final Set<String> _frozen = {};
   final Map<String, StreamController<MeditationSession>> _controllers = {};
 
+  /// Attendee identities per session — the stand-in for the Redis attendee set.
+  /// Kept here (not on the session model) because clients only ever see counts.
+  final Map<String, Set<String>> _attendees = {};
+
   final Random _rng = Random();
 
   @override
@@ -48,10 +52,11 @@ class MockAttendanceService implements AttendanceService {
       meditationStartAt: null,
       meditationEndAt: null,
       status: SessionStatus.collecting,
-      attendeeIds: const [],
+      attendeeCount: 0,
       shortCode: _generateCode(),
     );
     _hot[id] = session;
+    _attendees[id] = <String>{};
     _controllers[id] = StreamController<MeditationSession>.broadcast();
     return session;
   }
@@ -104,18 +109,17 @@ class MockAttendanceService implements AttendanceService {
   /// SADD-equivalent: add the attendee to the set, idempotently.
   AttendResult _join(String sessionId, String heartfulnessId) {
     final session = _hot[sessionId];
-    if (session == null) {
+    final attendees = _attendees[sessionId];
+    if (session == null || attendees == null) {
       return const AttendResult(outcome: AttendOutcome.notFound);
     }
-    if (session.attendeeIds.contains(heartfulnessId)) {
+    if (!attendees.add(heartfulnessId)) {
       return AttendResult(
         outcome: AttendOutcome.alreadyJoined,
         session: session,
       );
     }
-    final updated = session.copyWith(
-      attendeeIds: [...session.attendeeIds, heartfulnessId],
-    );
+    final updated = session.copyWith(attendeeCount: attendees.length);
     _hot[sessionId] = updated;
     _emit(updated);
     return AttendResult(outcome: AttendOutcome.joined, session: updated);
@@ -152,6 +156,7 @@ class MockAttendanceService implements AttendanceService {
     _store[sessionId] = finalized;
     _hot.remove(sessionId);
     _frozen.remove(sessionId);
+    _attendees.remove(sessionId);
     _emit(finalized);
     await _controllers[sessionId]?.close();
     _controllers.remove(sessionId);

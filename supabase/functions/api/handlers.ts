@@ -53,7 +53,10 @@ async function audit(
 }
 
 /// Snake_case DTO matching the Flutter MeditationSession.fromJson contract.
-function sessionDto(meta: SessionMeta, attendeeIds: string[]) {
+/// Carries only the attendee *count*, never the id list: clients don't need the
+/// identities, and shipping a growing 70k-id array on every attend would be
+/// O(n²). The full list is materialized only once, at the flush.
+function sessionDto(meta: SessionMeta, attendeeCount: number) {
   return {
     id: meta.id,
     preceptor_id: meta.preceptorId,
@@ -64,8 +67,7 @@ function sessionDto(meta: SessionMeta, attendeeIds: string[]) {
     meditation_start_at: meta.meditationStartAt,
     meditation_end_at: meta.meditationEndAt,
     status: meta.status,
-    attendee_ids: attendeeIds,
-    attendee_count: attendeeIds.length,
+    attendee_count: attendeeCount,
     short_code: meta.shortCode,
   };
 }
@@ -96,7 +98,7 @@ export async function startSession(
   };
   await buffer.createSession(meta);
   await audit(member, "session_start", meta.id);
-  return json(sessionDto(meta, []));
+  return json(sessionDto(meta, 0));
 }
 
 export async function attend(
@@ -126,7 +128,7 @@ export async function attend(
   if (nearby.length === 0) return json({ outcome: "notFound" });
   if (nearby.length > 1) {
     const candidates = await Promise.all(
-      nearby.map(async (m) => sessionDto(m, await buffer.attendees(m.id))),
+      nearby.map(async (m) => sessionDto(m, await buffer.count(m.id))),
     );
     return json({ outcome: "ambiguous", candidates });
   }
@@ -139,10 +141,11 @@ async function joinAndRespond(
   heartfulnessId: string,
 ): Promise<Response> {
   const added = await buffer.addAttendee(meta.id, heartfulnessId);
-  const attendees = await buffer.attendees(meta.id);
+  // SCARD, not SMEMBERS: the client only needs the running count.
+  const count = await buffer.count(meta.id);
   return json({
     outcome: added ? "joined" : "alreadyJoined",
-    session: sessionDto(meta, attendees),
+    session: sessionDto(meta, count),
   });
 }
 
@@ -173,7 +176,7 @@ export async function endAttendance(
   const updated: SessionMeta = { ...meta, frozen: true };
   await buffer.putMeta(updated);
   await audit(member, "end_attendance", updated.id);
-  return json(sessionDto(updated, await buffer.attendees(updated.id)));
+  return json(sessionDto(updated, await buffer.count(updated.id)));
 }
 
 export async function meditationStart(
@@ -190,7 +193,7 @@ export async function meditationStart(
   };
   await buffer.putMeta(updated);
   await audit(member, "meditation_start", updated.id);
-  return json(sessionDto(updated, await buffer.attendees(updated.id)));
+  return json(sessionDto(updated, await buffer.count(updated.id)));
 }
 
 /// The single flush: finalize, write ONE Postgres row, evict from the buffer.
@@ -201,6 +204,8 @@ export async function meditationStop(
 ): Promise<Response> {
   const owned = await ownedSession(buffer, body, member);
   if (owned instanceof Response) return owned;
+  // The one place the full attendee set is materialized: the single flush that
+  // writes it to Postgres. Everywhere else uses SCARD (count only).
   const attendees = await buffer.attendees(owned.id);
   const finalized: SessionMeta = {
     ...owned,
@@ -228,7 +233,7 @@ export async function meditationStop(
   await audit(member, "meditation_stop", finalized.id, {
     attendee_count: attendees.length,
   });
-  return json(sessionDto(finalized, attendees));
+  return json(sessionDto(finalized, attendees.length));
 }
 
 /// Delete the caller's *app login only*: the Supabase Auth (GoTrue) user, keyed
@@ -253,12 +258,16 @@ export async function getSession(buffer: Buffer, body: any): Promise<Response> {
   if (!id) return json({ error: "sessionId required" }, 400);
   const meta = await buffer.getMeta(id);
   if (meta) {
-    return json(sessionDto(meta, await buffer.attendees(id)));
+    return json(sessionDto(meta, await buffer.count(id)));
   }
-  // Finalized -> read the row.
+  // Finalized -> read the row. Select the count column explicitly, never the
+  // attendee_ids array (which can be 70k ids and isn't needed by any client).
   const { data, error } = await db()
     .from("meditation_sessions")
-    .select("*")
+    .select(
+      "id,preceptor_id,center_id,latitude,longitude,start_attendance_at," +
+        "meditation_start_at,meditation_end_at,status,attendee_count,short_code",
+    )
     .eq("id", id)
     .maybeSingle();
   if (error) return json({ error: error.message }, 500);

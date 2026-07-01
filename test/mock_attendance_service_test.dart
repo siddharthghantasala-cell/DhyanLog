@@ -41,8 +41,7 @@ void main() {
 
       expect(svc.finalizedSessions.length, 1);
       expect(done.status, SessionStatus.ended);
-      expect(done.attendeeCount, 3);
-      expect(done.attendeeIds, containsAll(['HFN-ABHY-001', 'HFN-ABHY-002']));
+      expect(done.attendeeCount, 3); // three distinct abhyasis, deduped
       expect(done.meditationStartAt, isNotNull);
       expect(done.meditationEndAt, isNotNull);
     });
