@@ -1,39 +1,62 @@
 import 'dart:async';
 
+import 'package:dhyanlog/models/participant.dart';
+import 'package:dhyanlog/services/auth/auth_api.dart';
 import 'package:dhyanlog/services/auth/auth_service.dart';
 import 'package:dhyanlog/services/auth/supabase_auth_gateway.dart';
 import 'package:dhyanlog/services/auth/supabase_auth_service.dart';
-import 'package:dhyanlog/services/mock/mock_participant_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// In-memory [SupabaseAuthGateway] standing in for Supabase Auth, so the
-/// service's linking + state logic is tested without a live connection.
-class FakeGateway implements SupabaseAuthGateway {
-  String? sentTo;
-  String? linkedHeartfulnessId;
+const _member = Participant(
+  heartfulnessId: 'HFN-PREC-001',
+  name: 'Asha Rao',
+  age: 40,
+  address: '',
+  email: 'asha.rao@example.org',
+  phone: '',
+  role: ParticipantRole.preceptor,
+);
+
+/// In-memory [AuthApi] standing in for the server-side OTP endpoints.
+class FakeAuthApi implements AuthApi {
+  String? requestedId;
+  bool failRequest = false;
   bool failVerify = false;
-  String issuedToken = 'jwt-token-1';
-  ({String accessToken, String? heartfulnessId})? session;
-
-  final StreamController<String?> _tokens = StreamController<String?>.broadcast();
-
-  void emitToken(String? token) => _tokens.add(token);
+  Participant? meResult; // what restore's me() returns
 
   @override
-  Future<void> sendOtp(String contact) async {
-    sentTo = contact;
+  Future<String> requestOtp(String heartfulnessId) async {
+    if (failRequest) throw const AuthException('No Heartfulness member found.');
+    requestedId = heartfulnessId;
+    return 'a***@example.org';
   }
 
   @override
-  Future<String> verifyOtp({
-    required String contact,
-    required String token,
-    required String heartfulnessId,
-  }) async {
-    if (failVerify) throw Exception('bad code');
-    linkedHeartfulnessId = heartfulnessId;
-    session = (accessToken: issuedToken, heartfulnessId: heartfulnessId);
-    return issuedToken;
+  Future<AuthVerification> verifyOtp(String heartfulnessId, String code) async {
+    if (failVerify) throw const AuthException('That code did not work.');
+    return const AuthVerification(
+      participant: _member,
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+    );
+  }
+
+  @override
+  Future<Participant?> me(String accessToken) async => meResult;
+}
+
+/// In-memory [SupabaseAuthGateway]: tracks the adopted session + token stream.
+class FakeGateway implements SupabaseAuthGateway {
+  String? adoptedRefreshToken;
+  ({String accessToken, String? heartfulnessId})? session;
+
+  final StreamController<String?> _tokens = StreamController<String?>.broadcast();
+  void emitToken(String? token) => _tokens.add(token);
+
+  @override
+  Future<void> setSession(String refreshToken) async {
+    adoptedRefreshToken = refreshToken;
+    session = (accessToken: 'access-1', heartfulnessId: 'HFN-PREC-001');
   }
 
   @override
@@ -49,36 +72,36 @@ class FakeGateway implements SupabaseAuthGateway {
 }
 
 void main() {
-  late MockParticipantRepository repo;
+  late FakeAuthApi api;
   late FakeGateway gateway;
   late SupabaseAuthService auth;
 
   setUp(() {
-    repo = MockParticipantRepository();
+    api = FakeAuthApi();
     gateway = FakeGateway();
-    auth = SupabaseAuthService(repo, gateway);
+    auth = SupabaseAuthService(api, gateway);
   });
 
   tearDown(() => auth.dispose());
 
-  group('SupabaseAuthService.requestOtp', () {
-    test('sends the OTP to the email on file and masks it', () async {
-      final challenge = await auth.requestOtp('HFN-PREC-001');
-      expect(gateway.sentTo, 'asha.rao@example.org');
+  group('requestOtp', () {
+    test('returns the masked hint and remembers the id, no session yet', () async {
+      final challenge = await auth.requestOtp('  HFN-PREC-001 ');
+      expect(api.requestedId, 'HFN-PREC-001'); // trimmed
       expect(challenge.maskedDestination, 'a***@example.org');
       expect(auth.currentSession, isNull);
     });
 
-    test('unknown member throws and sends nothing', () async {
+    test('a server rejection surfaces as AuthException', () async {
+      api.failRequest = true;
       await expectLater(
         auth.requestOtp('HFN-NOPE-999'),
         throwsA(isA<AuthException>()),
       );
-      expect(gateway.sentTo, isNull);
     });
   });
 
-  group('SupabaseAuthService.verifyOtp', () {
+  group('verifyOtp', () {
     test('verify before request throws', () async {
       await expectLater(
         auth.verifyOtp('123456'),
@@ -86,19 +109,19 @@ void main() {
       );
     });
 
-    test('success issues a session with the JWT and links the member', () async {
+    test('success adopts the session and exposes the member', () async {
       await auth.requestOtp('HFN-PREC-001');
       final session = await auth.verifyOtp('123456');
 
       expect(session.participant.heartfulnessId, 'HFN-PREC-001');
-      expect(session.accessToken, 'jwt-token-1');
-      expect(gateway.linkedHeartfulnessId, 'HFN-PREC-001'); // metadata link
+      expect(session.accessToken, 'access-1');
+      expect(gateway.adoptedRefreshToken, 'refresh-1'); // session adopted
       expect(auth.currentSession, isNotNull);
     });
 
-    test('gateway failure surfaces as a friendly AuthException', () async {
+    test('a bad code surfaces as AuthException and leaves no session', () async {
       await auth.requestOtp('HFN-PREC-001');
-      gateway.failVerify = true;
+      api.failVerify = true;
       await expectLater(
         auth.verifyOtp('000000'),
         throwsA(isA<AuthException>()),
@@ -107,23 +130,24 @@ void main() {
     });
   });
 
-  group('SupabaseAuthService.restoreSession', () {
-    test('rebuilds the session from a persisted auth user', () async {
-      gateway.session =
-          (accessToken: 'persisted-jwt', heartfulnessId: 'HFN-ABHY-001');
+  group('restoreSession', () {
+    test('rebuilds the session by fetching me() with the restored token', () async {
+      gateway.session = (accessToken: 'persisted', heartfulnessId: 'HFN-PREC-001');
+      api.meResult = _member;
       final restored = await auth.restoreSession();
 
       expect(restored, isNotNull);
-      expect(restored!.participant.heartfulnessId, 'HFN-ABHY-001');
-      expect(restored.accessToken, 'persisted-jwt');
+      expect(restored!.participant.heartfulnessId, 'HFN-PREC-001');
+      expect(restored.accessToken, 'persisted');
     });
 
-    test('returns null when the auth user was never linked', () async {
-      gateway.session = (accessToken: 'persisted-jwt', heartfulnessId: null);
+    test('returns null when there is no persisted session', () async {
       expect(await auth.restoreSession(), isNull);
     });
 
-    test('returns null with no persisted session', () async {
+    test('returns null when me() no longer resolves the member', () async {
+      gateway.session = (accessToken: 'persisted', heartfulnessId: 'HFN-PREC-001');
+      api.meResult = null;
       expect(await auth.restoreSession(), isNull);
     });
   });
@@ -131,12 +155,12 @@ void main() {
   test('a token refresh updates the live session token', () async {
     await auth.requestOtp('HFN-PREC-001');
     await auth.verifyOtp('123456');
-    expect(auth.currentSession!.accessToken, 'jwt-token-1');
+    expect(auth.currentSession!.accessToken, 'access-1');
 
-    gateway.emitToken('jwt-token-2');
+    gateway.emitToken('access-2');
     await Future<void>.delayed(Duration.zero); // let the listener run
 
-    expect(auth.currentSession!.accessToken, 'jwt-token-2');
+    expect(auth.currentSession!.accessToken, 'access-2');
   });
 
   test('signOut clears the session', () async {
@@ -146,11 +170,11 @@ void main() {
     expect(auth.currentSession, isNull);
   });
 
-  group('SupabaseAuthService.deleteAccount', () {
+  group('deleteAccount', () {
     test('calls the backend then signs out', () async {
       var backendCalled = false;
       final withDelete = SupabaseAuthService(
-        repo,
+        api,
         gateway,
         deleteAccountOnBackend: () async {
           backendCalled = true;
@@ -170,7 +194,7 @@ void main() {
     test('backend failure surfaces as AuthException and keeps the session',
         () async {
       final withDelete = SupabaseAuthService(
-        repo,
+        api,
         gateway,
         deleteAccountOnBackend: () async => throw Exception('500'),
       );

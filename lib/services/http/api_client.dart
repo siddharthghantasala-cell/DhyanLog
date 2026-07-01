@@ -75,11 +75,12 @@ class ApiClient {
     String route,
     Map<String, dynamic> body, {
     bool retryable = false,
+    String? authToken,
   }) async {
     final maxAttempts = retryable ? maxRetries + 1 : 1;
     for (var attempt = 0;; attempt++) {
       try {
-        return await _send(route, body);
+        return await _send(route, body, authToken);
       } on ApiException catch (e) {
         final canRetry = attempt + 1 < maxAttempts && e.isServerError;
         if (!canRetry) rethrow;
@@ -92,9 +93,12 @@ class ApiClient {
 
   Future<Map<String, dynamic>> _send(
     String route,
-    Map<String, dynamic> body,
-  ) async {
-    final bearer = _accessToken?.call() ?? anonKey;
+    Map<String, dynamic> body, [
+    String? authToken,
+  ]) async {
+    // Explicit [authToken] wins (used during session restore, before the
+    // current session is available); otherwise the live user JWT, then anon.
+    final bearer = authToken ?? _accessToken?.call() ?? anonKey;
     final http.Response resp;
     try {
       resp = await _client

@@ -6,19 +6,18 @@ import '../models/participant.dart';
 import '../services/attendance_service.dart';
 import '../services/auth/auth_service.dart';
 import '../services/auth/auth_session.dart';
+import '../services/auth/http_auth_api.dart';
 import '../services/auth/mock_auth_service.dart';
 import '../services/auth/supabase_auth_gateway_impl.dart';
 import '../services/auth/supabase_auth_service.dart';
 import '../services/http/api_client.dart';
 import '../services/http/http_attendance_service.dart';
-import '../services/http/http_participant_repository.dart';
 import '../services/mock/mock_attendance_service.dart';
 import '../services/mock/mock_participant_repository.dart';
 import '../services/observability/sentry_telemetry.dart';
 import '../services/observability/telemetry.dart';
 import '../services/offline/attend_queue.dart';
 import '../services/offline/prefs_queue_storage.dart';
-import '../services/participant_repository.dart';
 
 /// Crash/error reporting seam. Sentry when a DSN is configured (see main.dart),
 /// otherwise a no-op — so the app builds and runs with no external service.
@@ -30,24 +29,14 @@ final Provider<Telemetry> telemetryProvider = Provider<Telemetry>((ref) {
 /// Sends the signed-in user's JWT when present (read fresh at call time) so
 /// backend calls carry real identity, falling back to the anon key pre-login.
 // Explicit variable types below break a top-level inference cycle: the client's
-// token callback reads authServiceProvider, which (real) reads the repository,
-// which reads this client. The cycle is fine at runtime (the callback is lazy).
+// token callback reads authServiceProvider, which (real) reads this client for
+// its AuthApi. The cycle is fine at runtime (the callback is lazy).
 final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient(
     baseUrl: AppConfig.apiBaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
     accessToken: () => ref.read(authServiceProvider).currentSession?.accessToken,
   );
-});
-
-/// Real backend when SUPABASE_* dart-defines are set, mock otherwise. This is
-/// the single swap point between Phase 2 (mock) and Phase 3 (real).
-final Provider<ParticipantRepository> participantRepositoryProvider =
-    Provider<ParticipantRepository>((ref) {
-  if (AppConfig.useRealBackend) {
-    return HttpParticipantRepository(ref.read(apiClientProvider));
-  }
-  return MockParticipantRepository();
 });
 
 final attendanceServiceProvider = Provider<AttendanceService>((ref) {
@@ -72,7 +61,7 @@ final attendQueueProvider = Provider<AttendQueue>((ref) {
 final Provider<AuthService> authServiceProvider = Provider<AuthService>((ref) {
   if (AppConfig.useRealBackend) {
     return SupabaseAuthService(
-      ref.read(participantRepositoryProvider),
+      HttpAuthApi(ref.read(apiClientProvider)),
       SupabaseAuthGatewayImpl(Supabase.instance.client.auth),
       // Service-role delete of the auth user runs on the edge function, called
       // with the still-valid JWT before sign-out. Not retryable (a delete).
@@ -80,7 +69,7 @@ final Provider<AuthService> authServiceProvider = Provider<AuthService>((ref) {
           ref.read(apiClientProvider).post('account/delete', const {}),
     );
   }
-  return MockAuthService(ref.read(participantRepositoryProvider));
+  return MockAuthService(MockParticipantRepository());
 });
 
 /// The live auth session (null = signed out). Screens never set this; sign-in /

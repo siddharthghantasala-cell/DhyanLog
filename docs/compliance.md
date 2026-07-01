@@ -22,9 +22,14 @@ Pre-launch checklist for the official app. Items marked **(needs decision)** or
 
 - Interim email/phone OTP is live behind the `AuthService` seam. Swap in
   **Heartfulness SSO** (needs org IdP provisioning) with no UI change.
-- Remove the interim pre-login PII exposure: `participant-lookup` is anon-readable
-  so the client can start OTP. SSO removes the need for it; until then, consider a
-  server-side OTP-send route so member email never reaches the client.
+- **No pre-login PII exposure.** The OTP flow is fully server-side
+  (`auth/request-otp`, `auth/verify-otp`): the member's email/phone is resolved
+  and used on the server, and only a masked hint (`a***@domain`) is ever
+  returned. Session restore uses `auth/me`, which returns *only the caller's own*
+  record and requires a valid token. The old anon-readable `participant-lookup`
+  route has been removed. NOTE: `auth/request-otp` still confirms whether an ID
+  exists (it returns the masked hint), so member-ID enumeration is possible;
+  add rate limiting before public launch, and SSO removes this surface entirely.
 
 ## Reliability / scale (needs infra)
 

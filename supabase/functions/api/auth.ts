@@ -63,17 +63,18 @@ export function isAuthenticated(
 
 export function requiredAuth(route: string): AuthLevel {
   switch (route) {
-    // Pre-login lookup so the client can start the OTP flow. INTERIM: this
-    // exposes member contact info to the anon key; it goes away with Heartfulness
-    // SSO (identity comes from the IdP, no pre-auth lookup) or a server-side OTP
-    // send. Tracked in the production-hardening roadmap.
-    case "participant-lookup":
+    // Pre-login OTP flow. These are public because the caller isn't
+    // authenticated yet, but they never expose PII: the member's contact is
+    // resolved and used entirely server-side; only a masked hint is returned.
+    case "auth/request-otp":
+    case "auth/verify-otp":
       return "public";
     case "sessions/start":
     case "sessions/end-attendance":
     case "sessions/meditation-start":
     case "sessions/meditation-stop":
       return "leader";
+    case "auth/me":
     case "attend":
     case "sessions/get":
     case "account/delete":

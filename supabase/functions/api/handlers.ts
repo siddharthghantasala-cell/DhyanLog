@@ -70,19 +70,6 @@ function sessionDto(meta: SessionMeta, attendeeIds: string[]) {
   };
 }
 
-export async function lookupParticipant(body: any): Promise<Response> {
-  const id = cleanString(body.heartfulnessId, 128);
-  if (!id) return json({ error: "heartfulnessId required" }, 400);
-  const { data, error } = await db()
-    .from("participants")
-    .select("heartfulness_id,name,age,address,email,phone,role")
-    .ilike("heartfulness_id", id)
-    .maybeSingle();
-  if (error) return json({ error: error.message }, 500);
-  if (!data) return json({ participant: null });
-  return json({ participant: data });
-}
-
 export async function startSession(
   buffer: Buffer,
   body: any,

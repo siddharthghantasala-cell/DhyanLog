@@ -61,7 +61,9 @@ Deno.test("canLead is preceptor/master only", () => {
 });
 
 Deno.test("requiredAuth maps routes to levels", () => {
-  assertEquals(requiredAuth("participant-lookup"), "public");
+  assertEquals(requiredAuth("auth/request-otp"), "public");
+  assertEquals(requiredAuth("auth/verify-otp"), "public");
+  assertEquals(requiredAuth("auth/me"), "member");
   assertEquals(requiredAuth("attend"), "member");
   assertEquals(requiredAuth("sessions/get"), "member");
   assertEquals(requiredAuth("sessions/start"), "leader");

@@ -19,11 +19,11 @@ import {
   deleteAccount,
   endAttendance,
   getSession,
-  lookupParticipant,
   meditationStart,
   meditationStop,
   startSession,
 } from "./handlers.ts";
+import { me, requestOtp, verifyOtp } from "./otp.ts";
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("Origin");
@@ -83,8 +83,12 @@ Deno.serve(async (req) => {
 
   try {
     switch (path) {
-      case "participant-lookup":
-        return finish(await lookupParticipant(body));
+      case "auth/request-otp":
+        return finish(await requestOtp(body));
+      case "auth/verify-otp":
+        return finish(await verifyOtp(body));
+      case "auth/me":
+        return finish(await me(member!));
       case "sessions/start":
         return finish(await startSession(Buffer.fromEnv(), body, member!));
       case "attend":

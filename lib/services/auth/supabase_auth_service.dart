@@ -1,24 +1,20 @@
 import 'dart:async';
 
-import '../../models/participant.dart';
-import '../participant_repository.dart';
+import 'auth_api.dart';
 import 'auth_service.dart';
 import 'auth_session.dart';
-import 'contact_mask.dart';
 import 'supabase_auth_gateway.dart';
 
-/// Real [AuthService]: interim email/phone OTP via Supabase Auth, with the
-/// member identified by their Heartfulness ID. The contact the code is sent to
-/// is the email/phone already on the participant record ("on file"); the auth
-/// user is linked back to the participant via `heartfulness_id` in user
-/// metadata, so the session survives a restart. The per-user JWT it issues is
-/// what the [ApiClient] sends so backend calls carry real identity.
-///
-/// All sign-in logic lives here against the [SupabaseAuthGateway] seam; the
-/// Supabase SDK is only touched by `SupabaseAuthGatewayImpl`.
+/// Real [AuthService]: interim OTP sign-in where the member's email/phone stays
+/// entirely on the server. The client sends only a Heartfulness ID (step 1) and
+/// a code (step 2) through [AuthApi]; the server resolves the contact, sends and
+/// verifies the code, links the auth user to the member, and returns session
+/// tokens. This service then adopts that session on the [SupabaseAuthGateway]
+/// (so the SDK persists it and keeps the token fresh) and exposes the verified
+/// participant. Nothing here ever sees the raw contact — only a masked hint.
 class SupabaseAuthService implements AuthService {
   SupabaseAuthService(
-    this._participants,
+    this._api,
     this._gateway, {
     Future<void> Function()? deleteAccountOnBackend,
   }) : _deleteAccountOnBackend = deleteAccountOnBackend {
@@ -36,20 +32,20 @@ class SupabaseAuthService implements AuthService {
     });
   }
 
-  final ParticipantRepository _participants;
+  final AuthApi _api;
   final SupabaseAuthGateway _gateway;
 
   /// Calls the service-role edge route that deletes the auth user (GoTrue admin
   /// delete can't run client-side). Invoked while the JWT is still valid, before
   /// sign-out. Null in tests / when no backend is wired.
   final Future<void> Function()? _deleteAccountOnBackend;
+
   final StreamController<AuthSession?> _controller =
       StreamController<AuthSession?>.broadcast();
   StreamSubscription<String?>? _tokenSub;
 
   AuthSession? _current;
-  Participant? _pendingParticipant;
-  String? _pendingContact;
+  String? _pendingId; // Heartfulness ID from requestOtp, awaiting verifyOtp
 
   @override
   AuthSession? get currentSession => _current;
@@ -66,9 +62,10 @@ class SupabaseAuthService implements AuthService {
   @override
   Future<AuthSession?> restoreSession() async {
     final session = _gateway.currentSession();
-    final heartfulnessId = session?.heartfulnessId;
-    if (session == null || heartfulnessId == null) return null;
-    final participant = await _participants.findByHeartfulnessId(heartfulnessId);
+    if (session == null) return null;
+    // Re-fetch the member's own record from the server, authenticated with the
+    // just-restored token (the app has no current session to read yet).
+    final participant = await _api.me(session.accessToken);
     if (participant == null) return null;
     _current = AuthSession(
       participant: participant,
@@ -80,49 +77,25 @@ class SupabaseAuthService implements AuthService {
   @override
   Future<OtpChallenge> requestOtp(String heartfulnessId) async {
     final id = heartfulnessId.trim();
-    final participant = await _participants.findByHeartfulnessId(id);
-    if (participant == null) {
-      throw AuthException('No Heartfulness member found for "$id".');
-    }
-    final contact =
-        participant.email.isNotEmpty ? participant.email : participant.phone;
-    if (contact.isEmpty) {
-      throw const AuthException('No email or phone on file for this member.');
-    }
-    try {
-      await _gateway.sendOtp(contact);
-    } on AuthException {
-      rethrow;
-    } catch (_) {
-      throw const AuthException('Could not send a code. Please try again.');
-    }
-    _pendingParticipant = participant;
-    _pendingContact = contact;
-    return OtpChallenge(maskedDestination: maskContact(contact));
+    final masked = await _api.requestOtp(id);
+    _pendingId = id;
+    return OtpChallenge(maskedDestination: masked);
   }
 
   @override
   Future<AuthSession> verifyOtp(String code) async {
-    final participant = _pendingParticipant;
-    final contact = _pendingContact;
-    if (participant == null || contact == null) {
+    final id = _pendingId;
+    if (id == null) {
       throw const AuthException('Request a code first.');
     }
-    final String token;
-    try {
-      token = await _gateway.verifyOtp(
-        contact: contact,
-        token: code.trim(),
-        heartfulnessId: participant.heartfulnessId,
-      );
-    } on AuthException {
-      rethrow;
-    } catch (_) {
-      throw const AuthException('That code did not work. Please try again.');
-    }
-    final session = AuthSession(participant: participant, accessToken: token);
-    _pendingParticipant = null;
-    _pendingContact = null;
+    final result = await _api.verifyOtp(id, code.trim());
+    // Adopt the server-minted session so the SDK persists it and keeps it fresh.
+    await _gateway.setSession(result.refreshToken);
+    final session = AuthSession(
+      participant: result.participant,
+      accessToken: result.accessToken,
+    );
+    _pendingId = null;
     _current = session;
     _controller.add(session);
     return session;
@@ -131,8 +104,7 @@ class SupabaseAuthService implements AuthService {
   @override
   Future<void> signOut() async {
     await _gateway.signOut();
-    _pendingParticipant = null;
-    _pendingContact = null;
+    _pendingId = null;
     _current = null;
     _controller.add(null);
   }

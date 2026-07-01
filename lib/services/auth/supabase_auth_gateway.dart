@@ -1,19 +1,13 @@
-/// Thin seam over the Supabase Auth (GoTrue) calls that [SupabaseAuthService]
-/// needs. Keeping it abstract lets the service's linking/state logic be unit
-/// tested with a fake, without a live Supabase connection. The real
-/// implementation is `SupabaseAuthGatewayImpl` (imports `supabase_flutter`).
+/// Thin seam over the Supabase Auth (GoTrue) session lifecycle that
+/// [SupabaseAuthService] needs. The OTP send/verify now happen server-side (see
+/// [AuthApi]); this gateway only adopts and tracks the resulting session.
+/// Keeping it abstract lets the service's state logic be unit tested with a
+/// fake. The real implementation is `SupabaseAuthGatewayImpl`.
 abstract class SupabaseAuthGateway {
-  /// Send a one-time passcode to [contact] (email or E.164-ish phone).
-  Future<void> sendOtp(String contact);
-
-  /// Verify [token] for [contact]; on success persists [heartfulnessId] onto the
-  /// auth user (so [currentSession] can re-link after a restart) and returns the
-  /// access-token JWT. Throws if verification fails.
-  Future<String> verifyOtp({
-    required String contact,
-    required String token,
-    required String heartfulnessId,
-  });
+  /// Adopt the session produced by a server-side verify, from its refresh token.
+  /// The SDK then persists it (Keychain / Android Keystore) and keeps it fresh,
+  /// so it survives a restart.
+  Future<void> setSession(String refreshToken);
 
   /// The persisted session if one exists: the live access token plus the
   /// `heartfulness_id` stored in user metadata (null if never linked).
