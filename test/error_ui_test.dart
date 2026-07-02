@@ -1,3 +1,4 @@
+import 'package:dhyanlog/l10n/app_localizations.dart';
 import 'package:dhyanlog/models/attend_result.dart';
 import 'package:dhyanlog/services/attendance_service.dart';
 import 'package:dhyanlog/services/auth/auth_service.dart';
@@ -38,34 +39,39 @@ class _FailingAttendance implements AttendanceService {
 
 void main() {
   group('messageForError', () {
+    late AppLocalizations l10n;
+    setUpAll(() async {
+      l10n = await AppLocalizations.delegate.load(const Locale('en'));
+    });
+
     test('network error reads as offline', () {
-      expect(messageForError(NetworkException()), contains('offline'));
+      expect(messageForError(l10n, NetworkException()), contains('offline'));
     });
 
     test('401 reads as an expired session', () {
       expect(
-        messageForError(ApiException('x', 401)),
+        messageForError(l10n, ApiException('x', 401)),
         contains('session has expired'),
       );
       expect(isAuthError(ApiException('x', 401)), isTrue);
     });
 
     test('validation error passes the server message through', () {
-      expect(messageForError(ApiException('invalid centerId', 400)),
+      expect(messageForError(l10n, ApiException('invalid centerId', 400)),
           'invalid centerId');
     });
 
     test('server error is a generic try-again', () {
-      expect(messageForError(ApiException('x', 503)), contains('try again'));
+      expect(messageForError(l10n, ApiException('x', 503)), contains('try again'));
     });
 
     test('auth exception uses its own message', () {
-      expect(messageForError(const AuthException('Request a code first.')),
+      expect(messageForError(l10n, const AuthException('Request a code first.')),
           'Request a code first.');
     });
 
     test('unknown error is a safe fallback', () {
-      expect(messageForError(Exception('boom')), contains('went wrong'));
+      expect(messageForError(l10n, Exception('boom')), contains('went wrong'));
     });
   });
 
@@ -97,6 +103,8 @@ void main() {
           ),
         ],
         child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: AbhyasiAttendScreen(latitude: 13.08, longitude: 80.27),
         ),
       ),
@@ -118,6 +126,8 @@ void main() {
               .overrideWith((ref) => _FailingAttendance(NetworkException())),
         ],
         child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: AbhyasiAttendScreen(latitude: 13.08, longitude: 80.27),
         ),
       ),

@@ -19,10 +19,84 @@
   "loginEnterCode": "Enter the code you received",
   "commonSomethingWrong": "Something went wrong. Please try again.",
   "commonCancel": "Cancel",
+  "commonTryAgain": "Try again",
+  "errorOffline": "You appear to be offline. Check your connection and try again.",
+  "errorSessionExpired": "Your session has expired. Please sign in again.",
+  "errorServer": "The server had a problem. Please try again in a moment.",
   "homeLogOut": "Log out",
   "homeDeleteAccount": "Delete account",
   "deleteAccountTitle": "Delete account?",
   "deleteAccountBody": "This deletes your app login so you can no longer sign in. Your Heartfulness membership and past attendance records are kept by the organization and are not removed. This cannot be undone.",
   "deleteAccountConfirm": "Delete my login",
-  "deleteAccountError": "Could not delete your account. Please try again."
+  "deleteAccountError": "Could not delete your account. Please try again.",
+
+  "commonDone": "Done",
+  "commonOk": "OK",
+
+  "rolePreceptor": "Preceptor",
+  "roleAbhyasi": "Abhyasi",
+  "roleMaster": "Master",
+
+  "homeGreeting": "Namaste, {name}",
+  "@homeGreeting": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "homeStartAttendance": "Start Attendance",
+  "homeGiveAttendance": "Give Attendance",
+  "homeLocationLabel": "Your location (simulated GPS)",
+
+  "attendSavedOfflineTitle": "Saved offline",
+  "attendSavedOfflineMessage": "You're offline, so we saved your attendance. It will be recorded automatically when your connection returns.",
+  "attendRecordedTitle": "Attendance recorded",
+  "attendAlreadyTitle": "Already recorded",
+  "attendRecordedMessage": "You have been added to this session.",
+  "attendAlreadyMessage": "You were already in this session.",
+  "attendMultipleTitle": "Multiple sessions nearby",
+  "attendNoneTitle": "No session found nearby",
+  "attendMultipleMessage": "We could not tell which session you are in. Enter the code shown by your preceptor.",
+  "attendNoneMessage": "Enter the code shown by your preceptor, or scan their QR.",
+  "attendCodeLabel": "Session code",
+  "attendCodeHint": "e.g. K7M2PQ",
+  "attendJoinWithCode": "Join with code",
+  "attendRetryGps": "Retry GPS",
+  "attendNearbyHeader": "Sessions detected near you:",
+  "attendCandidateCode": "Code {code}",
+  "@attendCandidateCode": {
+    "placeholders": {
+      "code": { "type": "String" }
+    }
+  },
+  "attendCandidateCount": "{count, plural, =1{1 attending} other{{count} attending}}",
+  "@attendCandidateCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "sessionTitle": "Session",
+  "sessionAttendees": "Attendees",
+  "sessionMeditatingFor": "Meditating for {duration}",
+  "@sessionMeditatingFor": {
+    "placeholders": {
+      "duration": { "type": "String" }
+    }
+  },
+  "sessionEndAttendance": "End Attendance",
+  "sessionStartMeditation": "Start Meditation",
+  "sessionStopMeditation": "Stop Meditation",
+  "sessionSavedTitle": "Session saved",
+  "sessionSavedBody": "Finalized one record:\n• {count, plural, =1{1 attendee} other{{count} attendees}}\n• {minutes, plural, =1{1 min} other{{minutes} min}} meditation\n(written as a single row — the only DB write)",
+  "@sessionSavedBody": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "minutes": { "type": "int" }
+    }
+  },
+  "sessionStatusCollecting": "Collecting attendance",
+  "sessionStatusMeditating": "Meditation in progress",
+  "sessionStatusEnded": "Ended",
+  "sessionJoinPrompt": "Abhyasis join with this code",
+  "sessionCopyJoinLink": "Copy join link"
 }

@@ -178,6 +178,30 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get commonCancel;
 
+  /// No description provided for @commonTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get commonTryAgain;
+
+  /// No description provided for @errorOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'You appear to be offline. Check your connection and try again.'**
+  String get errorOffline;
+
+  /// No description provided for @errorSessionExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Your session has expired. Please sign in again.'**
+  String get errorSessionExpired;
+
+  /// No description provided for @errorServer.
+  ///
+  /// In en, this message translates to:
+  /// **'The server had a problem. Please try again in a moment.'**
+  String get errorServer;
+
   /// No description provided for @homeLogOut.
   ///
   /// In en, this message translates to:
@@ -213,6 +237,240 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not delete your account. Please try again.'**
   String get deleteAccountError;
+
+  /// No description provided for @commonDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get commonDone;
+
+  /// No description provided for @commonOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get commonOk;
+
+  /// No description provided for @rolePreceptor.
+  ///
+  /// In en, this message translates to:
+  /// **'Preceptor'**
+  String get rolePreceptor;
+
+  /// No description provided for @roleAbhyasi.
+  ///
+  /// In en, this message translates to:
+  /// **'Abhyasi'**
+  String get roleAbhyasi;
+
+  /// No description provided for @roleMaster.
+  ///
+  /// In en, this message translates to:
+  /// **'Master'**
+  String get roleMaster;
+
+  /// No description provided for @homeGreeting.
+  ///
+  /// In en, this message translates to:
+  /// **'Namaste, {name}'**
+  String homeGreeting(String name);
+
+  /// No description provided for @homeStartAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Attendance'**
+  String get homeStartAttendance;
+
+  /// No description provided for @homeGiveAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'Give Attendance'**
+  String get homeGiveAttendance;
+
+  /// No description provided for @homeLocationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your location (simulated GPS)'**
+  String get homeLocationLabel;
+
+  /// No description provided for @attendSavedOfflineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved offline'**
+  String get attendSavedOfflineTitle;
+
+  /// No description provided for @attendSavedOfflineMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re offline, so we saved your attendance. It will be recorded automatically when your connection returns.'**
+  String get attendSavedOfflineMessage;
+
+  /// No description provided for @attendRecordedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance recorded'**
+  String get attendRecordedTitle;
+
+  /// No description provided for @attendAlreadyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Already recorded'**
+  String get attendAlreadyTitle;
+
+  /// No description provided for @attendRecordedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'You have been added to this session.'**
+  String get attendRecordedMessage;
+
+  /// No description provided for @attendAlreadyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'You were already in this session.'**
+  String get attendAlreadyMessage;
+
+  /// No description provided for @attendMultipleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiple sessions nearby'**
+  String get attendMultipleTitle;
+
+  /// No description provided for @attendNoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No session found nearby'**
+  String get attendNoneTitle;
+
+  /// No description provided for @attendMultipleMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'We could not tell which session you are in. Enter the code shown by your preceptor.'**
+  String get attendMultipleMessage;
+
+  /// No description provided for @attendNoneMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code shown by your preceptor, or scan their QR.'**
+  String get attendNoneMessage;
+
+  /// No description provided for @attendCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Session code'**
+  String get attendCodeLabel;
+
+  /// No description provided for @attendCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. K7M2PQ'**
+  String get attendCodeHint;
+
+  /// No description provided for @attendJoinWithCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Join with code'**
+  String get attendJoinWithCode;
+
+  /// No description provided for @attendRetryGps.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry GPS'**
+  String get attendRetryGps;
+
+  /// No description provided for @attendNearbyHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Sessions detected near you:'**
+  String get attendNearbyHeader;
+
+  /// No description provided for @attendCandidateCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code {code}'**
+  String attendCandidateCode(String code);
+
+  /// No description provided for @attendCandidateCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 attending} other{{count} attending}}'**
+  String attendCandidateCount(int count);
+
+  /// No description provided for @sessionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Session'**
+  String get sessionTitle;
+
+  /// No description provided for @sessionAttendees.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendees'**
+  String get sessionAttendees;
+
+  /// No description provided for @sessionMeditatingFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Meditating for {duration}'**
+  String sessionMeditatingFor(String duration);
+
+  /// No description provided for @sessionEndAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'End Attendance'**
+  String get sessionEndAttendance;
+
+  /// No description provided for @sessionStartMeditation.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Meditation'**
+  String get sessionStartMeditation;
+
+  /// No description provided for @sessionStopMeditation.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Meditation'**
+  String get sessionStopMeditation;
+
+  /// No description provided for @sessionSavedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Session saved'**
+  String get sessionSavedTitle;
+
+  /// No description provided for @sessionSavedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalized one record:\n• {count, plural, =1{1 attendee} other{{count} attendees}}\n• {minutes, plural, =1{1 min} other{{minutes} min}} meditation\n(written as a single row — the only DB write)'**
+  String sessionSavedBody(int count, int minutes);
+
+  /// No description provided for @sessionStatusCollecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Collecting attendance'**
+  String get sessionStatusCollecting;
+
+  /// No description provided for @sessionStatusMeditating.
+  ///
+  /// In en, this message translates to:
+  /// **'Meditation in progress'**
+  String get sessionStatusMeditating;
+
+  /// No description provided for @sessionStatusEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Ended'**
+  String get sessionStatusEnded;
+
+  /// No description provided for @sessionJoinPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Abhyasis join with this code'**
+  String get sessionJoinPrompt;
+
+  /// No description provided for @sessionCopyJoinLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy join link'**
+  String get sessionCopyJoinLink;
 }
 
 class _AppLocalizationsDelegate

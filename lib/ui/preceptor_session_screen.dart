@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/meditation_session.dart';
 import '../state/providers.dart';
 import 'error_presentation.dart';
@@ -71,9 +72,10 @@ class _PreceptorSessionScreenState
   Widget build(BuildContext context) {
     final service = ref.read(attendanceServiceProvider);
     final scheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Session')),
+      appBar: AppBar(title: Text(l10n.sessionTitle)),
       body: SafeArea(
         child: StreamBuilder<MeditationSession>(
           stream: _sessionStream,
@@ -101,7 +103,7 @@ class _PreceptorSessionScreenState
                 children: [
                   _StatusChip(status: session.status),
                   const SizedBox(height: 16),
-                  Text('Attendees', textAlign: TextAlign.center,
+                  Text(l10n.sessionAttendees, textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.titleMedium),
                   Text(
                     '${session.attendeeCount}',
@@ -113,7 +115,8 @@ class _PreceptorSessionScreenState
                   ),
                   if (session.status == SessionStatus.meditating)
                     Text(
-                      'Meditating for ${_elapsed(session.meditationStartAt)}',
+                      l10n.sessionMeditatingFor(
+                          _elapsed(session.meditationStartAt)),
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
@@ -137,6 +140,7 @@ class _PreceptorSessionScreenState
     MeditationSession session,
   ) {
     final id = widget.sessionId;
+    final l10n = AppLocalizations.of(context)!;
     switch (session.status) {
       case SessionStatus.collecting:
         if (!_attendanceClosed) {
@@ -149,7 +153,7 @@ class _PreceptorSessionScreenState
                         if (mounted) setState(() => _attendanceClosed = true);
                       }),
               icon: const Icon(Icons.lock_clock),
-              label: const Text('End Attendance'),
+              label: Text(l10n.sessionEndAttendance),
             ),
           ];
         }
@@ -158,7 +162,7 @@ class _PreceptorSessionScreenState
             onPressed:
                 _busy ? null : () => _run(() => service.meditationStart(id)),
             icon: const Icon(Icons.play_arrow),
-            label: const Text('Start Meditation'),
+            label: Text(l10n.sessionStartMeditation),
           ),
         ];
       case SessionStatus.meditating:
@@ -175,37 +179,33 @@ class _PreceptorSessionScreenState
                       _showSummary(done);
                     }),
             icon: const Icon(Icons.stop),
-            label: const Text('Stop Meditation'),
+            label: Text(l10n.sessionStopMeditation),
           ),
         ];
       case SessionStatus.ended:
         return [
           FilledButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Done'),
+            child: Text(l10n.commonDone),
           ),
         ];
     }
   }
 
   void _showSummary(MeditationSession s) {
+    final l10n = AppLocalizations.of(context)!;
     final mins = s.meditationEndAt != null && s.meditationStartAt != null
         ? s.meditationEndAt!.difference(s.meditationStartAt!).inMinutes
         : 0;
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Session saved'),
-        content: Text(
-          'Finalized one record:\n'
-          '• ${s.attendeeCount} attendees\n'
-          '• $mins min meditation\n'
-          '(written as a single row — the only DB write)',
-        ),
+        title: Text(l10n.sessionSavedTitle),
+        content: Text(l10n.sessionSavedBody(s.attendeeCount, mins)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+            child: Text(l10n.commonOk),
           ),
         ],
       ),
@@ -228,10 +228,11 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final (label, color) = switch (status) {
-      SessionStatus.collecting => ('Collecting attendance', Colors.blue),
-      SessionStatus.meditating => ('Meditation in progress', Colors.green),
-      SessionStatus.ended => ('Ended', Colors.grey),
+      SessionStatus.collecting => (l10n.sessionStatusCollecting, Colors.blue),
+      SessionStatus.meditating => (l10n.sessionStatusMeditating, Colors.green),
+      SessionStatus.ended => (l10n.sessionStatusEnded, Colors.grey),
     };
     return Center(
       child: Chip(
@@ -250,12 +251,13 @@ class _JoinInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            const Text('Abhyasis join with this code'),
+            Text(l10n.sessionJoinPrompt),
             const SizedBox(height: 8),
             SelectableText(
               code,
@@ -267,7 +269,7 @@ class _JoinInfo extends StatelessWidget {
             const SizedBox(height: 8),
             TextButton.icon(
               icon: const Icon(Icons.copy, size: 16),
-              label: const Text('Copy join link'),
+              label: Text(l10n.sessionCopyJoinLink),
               onPressed: () =>
                   Clipboard.setData(ClipboardData(text: qr)),
             ),

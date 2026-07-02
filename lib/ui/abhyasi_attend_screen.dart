@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/attend_result.dart';
 import '../models/pending_attend.dart';
 import '../services/http/api_client.dart';
@@ -135,7 +136,7 @@ class _AbhyasiAttendScreenState extends ConsumerState<AbhyasiAttendScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Give Attendance')),
+      appBar: AppBar(title: Text(AppLocalizations.of(context)!.homeGiveAttendance)),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -152,20 +153,21 @@ class _AbhyasiAttendScreenState extends ConsumerState<AbhyasiAttendScreen> {
   }
 
   Widget _buildQueued(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return _Centered(
       icon: Icons.cloud_off,
       color: Colors.blueGrey,
-      title: 'Saved offline',
-      message: "You're offline, so we saved your attendance. It will be "
-          'recorded automatically when your connection returns.',
+      title: l10n.attendSavedOfflineTitle,
+      message: l10n.attendSavedOfflineMessage,
       action: FilledButton(
         onPressed: () => Navigator.of(context).pop(),
-        child: const Text('Done'),
+        child: Text(l10n.commonDone),
       ),
     );
   }
 
   Widget _buildResult(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final result = _result;
     if (result == null) return const SizedBox.shrink();
 
@@ -174,13 +176,13 @@ class _AbhyasiAttendScreenState extends ConsumerState<AbhyasiAttendScreen> {
       return _Centered(
         icon: Icons.check_circle,
         color: Colors.green,
-        title: joinedNew ? 'Attendance recorded' : 'Already recorded',
+        title: joinedNew ? l10n.attendRecordedTitle : l10n.attendAlreadyTitle,
         message: joinedNew
-            ? 'You have been added to this session.'
-            : 'You were already in this session.',
+            ? l10n.attendRecordedMessage
+            : l10n.attendAlreadyMessage,
         action: FilledButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Done'),
+          child: Text(l10n.commonDone),
         ),
       );
     }
@@ -192,45 +194,41 @@ class _AbhyasiAttendScreenState extends ConsumerState<AbhyasiAttendScreen> {
         _Centered.inline(
           icon: ambiguous ? Icons.help_outline : Icons.location_off,
           color: Colors.orange,
-          title: ambiguous
-              ? 'Multiple sessions nearby'
-              : 'No session found nearby',
-          message: ambiguous
-              ? 'We could not tell which session you are in. Enter the code '
-                  'shown by your preceptor.'
-              : 'Enter the code shown by your preceptor, or scan their QR.',
+          title: ambiguous ? l10n.attendMultipleTitle : l10n.attendNoneTitle,
+          message:
+              ambiguous ? l10n.attendMultipleMessage : l10n.attendNoneMessage,
         ),
         const SizedBox(height: 24),
         TextField(
           controller: _codeController,
           textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(
-            labelText: 'Session code',
-            hintText: 'e.g. K7M2PQ',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.pin),
+          decoration: InputDecoration(
+            labelText: l10n.attendCodeLabel,
+            hintText: l10n.attendCodeHint,
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.pin),
           ),
           onSubmitted: (v) => _tryCode(v),
         ),
         const SizedBox(height: 16),
         FilledButton(
           onPressed: () => _tryCode(),
-          child: const Text('Join with code'),
+          child: Text(l10n.attendJoinWithCode),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: _tryGps,
           icon: const Icon(Icons.my_location),
-          label: const Text('Retry GPS'),
+          label: Text(l10n.attendRetryGps),
         ),
         if (ambiguous) ...[
           const SizedBox(height: 24),
-          const Text('Sessions detected near you:'),
+          Text(l10n.attendNearbyHeader),
           for (final c in result.candidates)
             Card(
               child: ListTile(
-                title: Text('Code ${c.shortCode}'),
-                subtitle: Text('${c.attendeeCount} attending'),
+                title: Text(l10n.attendCandidateCode(c.shortCode)),
+                subtitle: Text(l10n.attendCandidateCount(c.attendeeCount)),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _tryCode(c.shortCode),
               ),

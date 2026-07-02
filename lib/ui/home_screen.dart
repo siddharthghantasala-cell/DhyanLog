@@ -10,6 +10,15 @@ import 'abhyasi_attend_screen.dart';
 import 'error_presentation.dart';
 import 'preceptor_session_screen.dart';
 
+/// Localized display name for a role.
+String roleLabel(AppLocalizations l10n, ParticipantRole role) {
+  return switch (role) {
+    ParticipantRole.preceptor => l10n.rolePreceptor,
+    ParticipantRole.abhyasi => l10n.roleAbhyasi,
+    ParticipantRole.master => l10n.roleMaster,
+  };
+}
+
 /// Landing screen after login. One large central action button whose meaning
 /// depends on the participant's role.
 class HomeScreen extends ConsumerStatefulWidget {
@@ -107,7 +116,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isLeader ? 'Preceptor' : 'Abhyasi'),
+        title: Text(isLeader ? l10n.rolePreceptor : l10n.roleAbhyasi),
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) {
@@ -155,7 +164,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const Spacer(),
               _BigButton(
-                label: isLeader ? 'Start Attendance' : 'Give Attendance',
+                label: isLeader ? l10n.homeStartAttendance : l10n.homeGiveAttendance,
                 color: scheme.primary,
                 onColor: scheme.onPrimary,
                 busy: _busy,
@@ -178,12 +187,13 @@ class _Greeting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
-        Text('Namaste, $name',
+        Text(l10n.homeGreeting(name),
             style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 4),
-        Chip(label: Text(role.name.toUpperCase())),
+        Chip(label: Text(roleLabel(l10n, role).toUpperCase())),
       ],
     );
   }
@@ -197,11 +207,12 @@ class _LocationPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return InputDecorator(
-      decoration: const InputDecoration(
-        labelText: 'Your location (simulated GPS)',
-        prefixIcon: Icon(Icons.location_on_outlined),
-        border: OutlineInputBorder(),
+      decoration: InputDecoration(
+        labelText: l10n.homeLocationLabel,
+        prefixIcon: const Icon(Icons.location_on_outlined),
+        border: const OutlineInputBorder(),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<MeditationCenter>(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/auth/auth_service.dart';
 import '../services/http/api_client.dart';
 import '../state/providers.dart';
@@ -8,20 +9,22 @@ import '../state/providers.dart';
 /// A user-safe, plain-language message for any error thrown by the service
 /// layer. Keeps raw exception text out of the UI while still distinguishing the
 /// cases a user can act on (offline vs. expired session vs. server hiccup).
-String messageForError(Object error) {
+/// Messages that originate on the server (validation / auth) are already
+/// user-safe and are passed through unlocalized.
+String messageForError(AppLocalizations l10n, Object error) {
   if (error is NetworkException) {
-    return 'You appear to be offline. Check your connection and try again.';
+    return l10n.errorOffline;
   }
   if (error is ApiException) {
-    if (error.isAuth) return 'Your session has expired. Please sign in again.';
+    if (error.isAuth) return l10n.errorSessionExpired;
     if (error.isValidation) return error.message; // server message is user-safe
     if (error.isServerError) {
-      return 'The server had a problem. Please try again in a moment.';
+      return l10n.errorServer;
     }
     return error.message;
   }
   if (error is AuthException) return error.message;
-  return 'Something went wrong. Please try again.';
+  return l10n.commonSomethingWrong;
 }
 
 /// Whether an error means the caller's session is no longer valid.
@@ -42,9 +45,10 @@ bool isUnexpected(Object error) {
 /// telemetry. Use for one-shot action failures (a tapped button), where the
 /// screen otherwise stays put.
 void showActionError(WidgetRef ref, BuildContext context, Object error) {
+  final l10n = AppLocalizations.of(context)!;
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(messageForError(error))));
+    ..showSnackBar(SnackBar(content: Text(messageForError(l10n, error))));
   if (isAuthError(error)) {
     ref.read(authServiceProvider).signOut();
   }
@@ -64,6 +68,7 @@ class ErrorRetry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -71,7 +76,7 @@ class ErrorRetry extends StatelessWidget {
           Icon(Icons.cloud_off, size: 72, color: scheme.error),
           const SizedBox(height: 16),
           Text(
-            messageForError(error),
+            messageForError(l10n, error),
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleMedium,
           ),
@@ -79,7 +84,7 @@ class ErrorRetry extends StatelessWidget {
           FilledButton.icon(
             onPressed: onRetry,
             icon: const Icon(Icons.refresh),
-            label: const Text('Try again'),
+            label: Text(l10n.commonTryAgain),
           ),
         ],
       ),
