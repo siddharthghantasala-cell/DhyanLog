@@ -7,7 +7,7 @@ worldwide.
 
 A session leader (**preceptor**) starts an attendance window; attendees (**abhyasis**)
 mark attendance; the session then runs and ends. Participants are identified by their
-**Heartfulness ID**.
+**Heartfulness ID** and sign in with a one-time passcode.
 
 ## The one idea that shapes everything
 
@@ -22,27 +22,44 @@ collecting ──(abhyasis join, in Redis)──► meditating ──► STOP = 
    start attendance        give attendance       start            (the only write)
 ```
 
-So whether 3 or 70,000 people attend, it's one row, one write.
+So whether 3 or 70,000 people attend, it's one row, one write. Clients only ever
+receive the running **count**, never the id list (which would be O(n²) at scale).
 
 ## Architecture
 
 ```
-Flutter app ─(AttendanceService / ParticipantRepository)─► Mock (no config)
-                                                            HTTP  ─► Supabase Edge Function `api`
-                                                                        │
-                                                  ┌─────────────────────┤
-                                                  ▼                     ▼
-                                            Upstash Redis         Supabase Postgres
-                                          open sessions (hot)    one row per session
-                                          geo-bucket matching    monthly analytics job
+Flutter app ─(AttendanceService / AuthService seams)─► Mock (no config)
+                                                        HTTP ─► Supabase Edge Function `api`
+                                                                    │
+                                              ┌─────────────────────┤
+                                              ▼                     ▼
+                                        Upstash Redis         Supabase Postgres
+                                      open sessions (hot)    one row per session
+                                      geo-bucket matching    + audit / checkpoints
 ```
 
-- **Frontend:** Flutter (Riverpod). Login by Heartfulness ID; role-based preceptor /
-  abhyasi modes with distinct themes; one large central action button.
+- **Frontend:** Flutter (Riverpod). Role-based preceptor / abhyasi modes with distinct
+  themes; one large central action button. Dark mode; fully localized (English,
+  translation-ready). Offline attend queue; typed errors with retry/offline states.
 - **Backend:** a single routed Supabase Edge Function (`supabase/functions/api`) over an
-  Upstash Redis buffer; the only Postgres write is the meditation-stop flush.
+  Upstash Redis buffer; the only `meditation_sessions` write is the meditation-stop flush.
 - **Swap point:** `lib/state/providers.dart` chooses the real backend when
   `SUPABASE_URL` + `SUPABASE_ANON_KEY` are provided, else the in-memory mock.
+
+## Security & auth
+
+- **Sign-in is two-step OTP**, fully server-side: the client sends a Heartfulness ID and
+  a code and never sees the member's email/phone — only a masked hint (`a***@domain`).
+  Behind the `AuthService` seam so **Heartfulness SSO** can swap in with no UI change.
+- **Backend authorization** by route (public / member / leader), keyed off the
+  GoTrue-**verified `email` claim** (not user-writable metadata). Preceptors can only
+  manage their own sessions.
+- **Rate limiting** on the public OTP routes (per-ID + per-IP, Upstash counters).
+- **RLS deny-all** on all tables; clients never touch Postgres directly (service-role
+  edge function only). In-app **account deletion** (removes the login only).
+- Structured request logs + an **audit trail** for session lifecycle + account deletion.
+- Config/secrets via `--dart-define` (client) and function secrets (server); see
+  `config/README.md`. CORS allowlist via `ALLOWED_ORIGINS`.
 
 ## Data model (`supabase/migrations`)
 - `participants` — Heartfulness members (dummy/seed now; real internal DB later).
@@ -51,13 +68,19 @@ Flutter app ─(AttendanceService / ParticipantRepository)─► Mock (no config
   `attendee_count`.
 - `attendance_expanded` — normalized rows for analytics, built **off the hot path** by
   the monthly `expand_attendance()` job.
+- `audit_log` — session lifecycle + account-deletion actions (never per-attendee).
+- `session_checkpoints` — durability copy of the frozen attendee set so a mid-meditation
+  Redis loss can still be finalized.
 
 ## Run it
 
-### Mock backend (no setup)
+### Mock backend (no setup) — the easy way to try it
 ```sh
-flutter run            # uses the in-memory mock; seeded IDs below
+flutter run            # in-memory mock; no backend, no OTP delivery
 ```
+Sign in with a seeded ID and **any 6-digit code** (the mock accepts anything). Location
+is a simulated picker, so no GPS permission is needed. Works on a connected phone too
+(`flutter run -d <device>`).
 
 ### Real backend (Supabase + Upstash)
 ```sh
@@ -65,7 +88,9 @@ flutter run -d chrome \
   --dart-define=SUPABASE_URL=https://<ref>.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=<anon-key>
 ```
-Full deploy steps: [`docs/phase3-deploy.md`](docs/phase3-deploy.md).
+Requires the `api` function **deployed** (with all migrations applied) and an SMTP
+provider configured for OTP email. Deploy + launch steps:
+[`docs/launch-checklist.md`](docs/launch-checklist.md), [`docs/release.md`](docs/release.md).
 
 ### Seeded IDs
 - Preceptor: `HFN-PREC-001`, `HFN-PREC-002` · Master: `HFN-MASTER-000`
@@ -73,24 +98,33 @@ Full deploy steps: [`docs/phase3-deploy.md`](docs/phase3-deploy.md).
 
 ## Test
 ```sh
-flutter analyze
-flutter test           # lifecycle, dedupe, ambiguity→code, out-of-range, freeze, boot
+flutter analyze && flutter test                    # 59 tests
+cd supabase/functions/api && deno fmt --check . && deno check index.ts && deno test -A   # 32 tests
 ```
+CI runs all of the above plus a web build and an iOS compile-check
+(`.github/workflows/ci.yml`).
 
 ## Project layout
 ```
 lib/
-  models/      contracts (participant, center, session, attend-result)
-  services/    AttendanceService + ParticipantRepository (mock/ and http/ impls)
+  models/      contracts (participant, center, session, attend-result, pending-attend)
+  services/    auth/ (AuthService + OTP), http/ (ApiClient + impls), mock/,
+               offline/ (attend queue), observability/ (telemetry)
   state/       Riverpod providers (the mock↔real swap point)
-  ui/          login, home, preceptor session, abhyasi attend
+  ui/          login, home, preceptor session, abhyasi attend, error presentation
+  l10n/        ARB strings + generated localizations
+  theme/       role themes, dark mode, design tokens
 supabase/
-  migrations/  schema + monthly-job scheduling
-  functions/api/  the routed edge function (Redis buffer + flush)
-docs/          deployment runbook
-FUTURE_VENTURES.md   deferred ideas (language, voice, maps, SSO, ML, …)
+  migrations/  schema, audit, checkpoints, monthly-job scheduling
+  functions/api/  the routed edge function (auth/OTP, buffer + flush, rate limiting)
+android/ ios/  mobile targets
+docs/          launch checklist, release, privacy, compliance runbooks
 ```
 
 ## Status
-Phases 1–3 complete and verified; backend deployed. Roadmap and deferred features in
+Production-hardening complete and verified (auth, resilience, observability, CI/CD,
+UI/i18n, compliance, checkpointing). Web + Android + iOS targets build; the iOS target
+is scaffolded (signing needs an Apple account). Remaining work is accounts / infra /
+legal / store submission — tracked in
+[`docs/launch-checklist.md`](docs/launch-checklist.md). Deferred ideas:
 [`FUTURE_VENTURES.md`](FUTURE_VENTURES.md).
