@@ -47,14 +47,21 @@ Bump `version:` in `pubspec.yaml` (`x.y.z+build`) each release.
 
 ## iOS — (needs Apple Developer account + macOS)
 
-The `ios/` target isn't generated yet. On a Mac:
+The `ios/` target **is scaffolded** (bundle id `org.heartfulness.dhyanlog`,
+matching Android; `NSLocationWhenInUseUsageDescription` set for the attendance
+GPS use). CI compile-checks it on every change via the `ios-build` job
+(`macos-latest`, `flutter build ios --no-codesign`) — no Apple account needed to
+keep it building.
 
-```sh
-flutter create --platforms=ios .
-```
+Remaining, once the Apple Developer account exists (needs macOS + Xcode):
 
-Then set the bundle id + signing team in Xcode, create provisioning profiles,
-and `flutter build ipa` → upload via Transporter / App Store Connect.
+1. Create the App Store Connect app record for `org.heartfulness.dhyanlog`.
+2. In Xcode, set the signing **Team** and let it manage provisioning profiles
+   (or create them manually).
+3. `flutter build ipa` → upload via Transporter / App Store Connect.
+
+Signing can be automated later with a `macos-latest` deploy job using an App
+Store Connect API key + Fastlane match (out of scope until the account exists).
 
 ## Store submission — (needs store accounts)
 

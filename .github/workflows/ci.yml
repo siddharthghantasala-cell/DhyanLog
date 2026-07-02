@@ -23,6 +23,21 @@ jobs:
       # Compile-check the web target (catches integration breaks unit tests miss).
       - run: flutter build web --no-tree-shake-icons
 
+  ios-build:
+    name: iOS compile check (no signing)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter --version
+      - run: flutter pub get
+      # Proves the iOS target compiles on every change. No Apple account / certs
+      # needed (--no-codesign); real signing + upload happen once the developer
+      # account is provisioned. See docs/release.md.
+      - run: flutter build ios --no-codesign
+
   edge-function:
     name: Edge function check, fmt & test
     runs-on: ubuntu-latest
