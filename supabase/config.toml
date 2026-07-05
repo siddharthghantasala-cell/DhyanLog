@@ -21,6 +21,17 @@ port = 54323
 enabled = true
 # Real Heartfulness SSO is a future venture; no auth providers wired yet.
 
+# Resend SMTP so OTP email isn't capped by Supabase's shared dev sender.
+# Sandbox sender for now; swap to a verified Heartfulness domain before launch.
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 587
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+admin_email = "onboarding@resend.dev"
+sender_name = "DhyanLog"
+
 # The single routed API function. JWT verification stays ON (the app sends the
 # anon key); the function itself uses the service-role key internally.
 [functions.api]

@@ -21,7 +21,7 @@ export interface RateLimitRule {
 // legitimate members can share one venue/carrier NAT IP, so a tight per-IP cap
 // would lock a whole center out of logging in. Raise/lower per deployment.
 export const OTP_REQUEST_PER_ID: RateLimitRule = {
-  limit: 3,
+  limit: 20,
   windowSeconds: 300,
 };
 export const OTP_REQUEST_PER_IP: RateLimitRule = {
