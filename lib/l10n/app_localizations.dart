@@ -202,6 +202,30 @@ abstract class AppLocalizations {
   /// **'The server had a problem. Please try again in a moment.'**
   String get errorServer;
 
+  /// No description provided for @errorLocationOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Location (GPS) is turned off on this device. Turn it on and try again.'**
+  String get errorLocationOff;
+
+  /// No description provided for @errorLocationDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission was denied. Allow it so we can find the session near you.'**
+  String get errorLocationDenied;
+
+  /// No description provided for @errorLocationBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission is blocked. Enable it for DhyanLog in your device settings.'**
+  String get errorLocationBlocked;
+
+  /// No description provided for @errorLocationTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not get a GPS fix. Try again in the open, or join with the session code.'**
+  String get errorLocationTimeout;
+
   /// No description provided for @homeLogOut.
   ///
   /// In en, this message translates to:
@@ -289,8 +313,14 @@ abstract class AppLocalizations {
   /// No description provided for @homeLocationLabel.
   ///
   /// In en, this message translates to:
-  /// **'Your location (simulated GPS)'**
+  /// **'Your location'**
   String get homeLocationLabel;
+
+  /// No description provided for @homeLocationGps.
+  ///
+  /// In en, this message translates to:
+  /// **'My current location (GPS)'**
+  String get homeLocationGps;
 
   /// No description provided for @attendSavedOfflineTitle.
   ///

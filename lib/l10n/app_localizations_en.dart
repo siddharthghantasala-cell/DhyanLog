@@ -69,6 +69,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'The server had a problem. Please try again in a moment.';
 
   @override
+  String get errorLocationOff =>
+      'Location (GPS) is turned off on this device. Turn it on and try again.';
+
+  @override
+  String get errorLocationDenied =>
+      'Location permission was denied. Allow it so we can find the session near you.';
+
+  @override
+  String get errorLocationBlocked =>
+      'Location permission is blocked. Enable it for DhyanLog in your device settings.';
+
+  @override
+  String get errorLocationTimeout =>
+      'Could not get a GPS fix. Try again in the open, or join with the session code.';
+
+  @override
   String get homeLogOut => 'Log out';
 
   @override
@@ -115,7 +131,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeGiveAttendance => 'Give Attendance';
 
   @override
-  String get homeLocationLabel => 'Your location (simulated GPS)';
+  String get homeLocationLabel => 'Your location';
+
+  @override
+  String get homeLocationGps => 'My current location (GPS)';
 
   @override
   String get attendSavedOfflineTitle => 'Saved offline';

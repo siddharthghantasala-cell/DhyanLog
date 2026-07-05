@@ -12,6 +12,8 @@ import '../services/auth/supabase_auth_gateway_impl.dart';
 import '../services/auth/supabase_auth_service.dart';
 import '../services/http/api_client.dart';
 import '../services/http/http_attendance_service.dart';
+import '../services/location/geolocator_location_service.dart';
+import '../services/location/location_service.dart';
 import '../services/mock/mock_attendance_service.dart';
 import '../services/mock/mock_participant_repository.dart';
 import '../services/observability/sentry_telemetry.dart';
@@ -37,6 +39,13 @@ final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
     anonKey: AppConfig.supabaseAnonKey,
     accessToken: () => ref.read(authServiceProvider).currentSession?.accessToken,
   );
+});
+
+/// Device-location seam. The real GPS works in both mock and real modes (the
+/// home screen's picker decides whether it's used); tests override this with a
+/// fake to avoid touching the platform.
+final locationServiceProvider = Provider<LocationService>((ref) {
+  return GeolocatorLocationService();
 });
 
 final attendanceServiceProvider = Provider<AttendanceService>((ref) {

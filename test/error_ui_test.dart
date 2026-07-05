@@ -3,6 +3,7 @@ import 'package:dhyanlog/models/attend_result.dart';
 import 'package:dhyanlog/services/attendance_service.dart';
 import 'package:dhyanlog/services/auth/auth_service.dart';
 import 'package:dhyanlog/services/http/api_client.dart';
+import 'package:dhyanlog/services/location/location_service.dart';
 import 'package:dhyanlog/services/mock/seed_data.dart';
 import 'package:dhyanlog/state/providers.dart';
 import 'package:dhyanlog/ui/abhyasi_attend_screen.dart';
@@ -73,12 +74,39 @@ void main() {
     test('unknown error is a safe fallback', () {
       expect(messageForError(l10n, Exception('boom')), contains('went wrong'));
     });
+
+    test('location errors read as actionable guidance', () {
+      expect(
+        messageForError(
+            l10n, const LocationException(LocationFailure.servicesDisabled)),
+        contains('turned off'),
+      );
+      expect(
+        messageForError(
+            l10n, const LocationException(LocationFailure.permissionDenied)),
+        contains('denied'),
+      );
+      expect(
+        messageForError(l10n,
+            const LocationException(LocationFailure.permissionDeniedForever)),
+        contains('settings'),
+      );
+      expect(
+        messageForError(
+            l10n, const LocationException(LocationFailure.timeout)),
+        contains('session code'),
+      );
+    });
   });
 
   group('isUnexpected (telemetry gating)', () {
     test('expected errors are not reported', () {
       expect(isUnexpected(NetworkException()), isFalse); // offline
       expect(isUnexpected(const AuthException('x')), isFalse);
+      expect(
+        isUnexpected(const LocationException(LocationFailure.timeout)),
+        isFalse,
+      );
       expect(isUnexpected(ApiException('x', 400)), isFalse); // validation
       expect(isUnexpected(ApiException('x', 401)), isFalse); // auth
     });

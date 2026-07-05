@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
 import '../services/auth/auth_service.dart';
 import '../services/http/api_client.dart';
+import '../services/location/location_service.dart';
 import '../state/providers.dart';
 
 /// A user-safe, plain-language message for any error thrown by the service
@@ -24,6 +25,14 @@ String messageForError(AppLocalizations l10n, Object error) {
     return error.message;
   }
   if (error is AuthException) return error.message;
+  if (error is LocationException) {
+    return switch (error.failure) {
+      LocationFailure.servicesDisabled => l10n.errorLocationOff,
+      LocationFailure.permissionDenied => l10n.errorLocationDenied,
+      LocationFailure.permissionDeniedForever => l10n.errorLocationBlocked,
+      LocationFailure.timeout => l10n.errorLocationTimeout,
+    };
+  }
   return l10n.commonSomethingWrong;
 }
 
@@ -36,6 +45,8 @@ bool isAuthError(Object error) => error is ApiException && error.isAuth;
 bool isUnexpected(Object error) {
   if (error is NetworkException) return false;
   if (error is AuthException) return false;
+  if (error is LocationException) return false; // user-actionable
+
   if (error is ApiException) return error.isServerError;
   return true;
 }

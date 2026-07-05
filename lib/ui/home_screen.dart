@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/app_config.dart';
 import '../l10n/app_localizations.dart';
 import '../models/meditation_center.dart';
 import '../models/participant.dart';
@@ -29,10 +30,34 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  // Simulated device location for the mock phase: pick a center. In production
-  // this is replaced by real GPS.
-  late MeditationCenter _location = SeedData.centers.first;
+  // Where actions report from: a picked center, or null = the device's real
+  // GPS position (resolved at button press). Real backend defaults to GPS;
+  // mock keeps the simulated center picker so seeded sessions still match.
+  MeditationCenter? _center =
+      AppConfig.useRealBackend ? null : SeedData.centers.first;
   bool _busy = false;
+
+  /// The coordinates (and optional center tag) to act from. A picked center is
+  /// immediate; GPS requests permission and reads a fresh fix, throwing a
+  /// LocationException the caller surfaces via showActionError.
+  Future<({String? centerId, double latitude, double longitude})>
+      _resolveLocation() async {
+    final center = _center;
+    if (center != null) {
+      return (
+        centerId: center.id,
+        latitude: center.latitude,
+        longitude: center.longitude,
+      );
+    }
+    final position =
+        await ref.read(locationServiceProvider).currentPosition();
+    return (
+      centerId: null,
+      latitude: position.latitude,
+      longitude: position.longitude,
+    );
+  }
 
   @override
   void initState() {
@@ -46,13 +71,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
+      final location = await _resolveLocation();
       if (me.role.canLead) {
         final service = ref.read(attendanceServiceProvider);
         final session = await service.startSession(
           preceptorId: me.heartfulnessId,
-          centerId: _location.id,
-          latitude: _location.latitude,
-          longitude: _location.longitude,
+          centerId: location.centerId,
+          latitude: location.latitude,
+          longitude: location.longitude,
         );
         if (!mounted) return;
         Navigator.of(context).push(MaterialPageRoute(
@@ -62,8 +88,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (!mounted) return;
         Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => AbhyasiAttendScreen(
-            latitude: _location.latitude,
-            longitude: _location.longitude,
+            latitude: location.latitude,
+            longitude: location.longitude,
           ),
         ));
       }
@@ -159,8 +185,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               _Greeting(name: me.name, role: me.role),
               const SizedBox(height: 16),
               _LocationPicker(
-                value: _location,
-                onChanged: (c) => setState(() => _location = c),
+                value: _center,
+                onChanged: (c) => setState(() => _center = c),
               ),
               const Spacer(),
               _BigButton(
@@ -202,8 +228,13 @@ class _Greeting extends StatelessWidget {
 class _LocationPicker extends StatelessWidget {
   const _LocationPicker({required this.value, required this.onChanged});
 
-  final MeditationCenter value;
-  final ValueChanged<MeditationCenter> onChanged;
+  /// The picked center, or null for the device's real GPS position.
+  final MeditationCenter? value;
+  final ValueChanged<MeditationCenter?> onChanged;
+
+  // DropdownButton renders its hint for a null value, so GPS gets a string
+  // sentinel and centers are keyed by id.
+  static const String _gps = '__gps__';
 
   @override
   Widget build(BuildContext context) {
@@ -211,18 +242,25 @@ class _LocationPicker extends StatelessWidget {
     return InputDecorator(
       decoration: InputDecoration(
         labelText: l10n.homeLocationLabel,
-        prefixIcon: const Icon(Icons.location_on_outlined),
+        prefixIcon: Icon(
+          value == null ? Icons.my_location : Icons.location_on_outlined,
+        ),
         border: const OutlineInputBorder(),
       ),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<MeditationCenter>(
+        child: DropdownButton<String>(
           isExpanded: true,
-          value: value,
+          value: value?.id ?? _gps,
           items: [
+            DropdownMenuItem(value: _gps, child: Text(l10n.homeLocationGps)),
             for (final c in SeedData.centers)
-              DropdownMenuItem(value: c, child: Text(c.name)),
+              DropdownMenuItem(value: c.id, child: Text(c.name)),
           ],
-          onChanged: (c) => c == null ? null : onChanged(c),
+          onChanged: (id) => onChanged(
+            id == null || id == _gps
+                ? null
+                : SeedData.centers.firstWhere((c) => c.id == id),
+          ),
         ),
       ),
     );
