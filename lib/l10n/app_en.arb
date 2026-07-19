@@ -66,6 +66,7 @@
   "attendCodeHint": "e.g. K7M2PQ",
   "attendJoinWithCode": "Join with code",
   "attendRetryGps": "Retry GPS",
+  "attendContinue": "Continue",
   "attendNearbyHeader": "Sessions detected near you:",
   "attendCandidateCode": "Code {code}",
   "@attendCandidateCode": {
@@ -103,5 +104,68 @@
   "sessionStatusMeditating": "Meditation in progress",
   "sessionStatusEnded": "Ended",
   "sessionJoinPrompt": "Abhyasis join with this code",
-  "sessionCopyJoinLink": "Copy join link"
+  "sessionCopyJoinLink": "Copy join link",
+
+  "meditationWaitingTitle": "Waiting to begin",
+  "meditationWaitingBody": "Your attendance is recorded. Stay on this screen — your phone will be silenced as soon as the preceptor begins the meditation.",
+  "meditationInProgressTitle": "Meditation in progress",
+  "meditationCompleteTitle": "Meditation complete",
+  "meditationCompleteBody": "{minutes, plural, =0{Your sitting has ended.} =1{You meditated for 1 minute.} other{You meditated for {minutes} minutes.}}",
+  "@meditationCompleteBody": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "meditationAttendees": "{count, plural, =1{1 meditating} other{{count} meditating}}",
+  "@meditationAttendees": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "meditationMuted": "Notifications silenced",
+  "meditationMuteOff": "Notifications not silenced",
+  "meditationMuteDisabled": "Silencing is turned off in your settings.",
+  "meditationMuteUnsupported": "iOS does not let apps silence notifications. Turn on a Focus mode to avoid interruptions.",
+  "meditationMutePermission": "Allow DhyanLog to silence notifications during meditation.",
+  "meditationMuteGrant": "Allow",
+  "meditationLeave": "Leave",
+  "meditationLeaveTitle": "Leave this screen?",
+  "meditationLeaveBody": "Your attendance is already recorded and will not be lost. Leaving restores your notifications.",
+  "meditationBackHome": "Back to home",
+
+  "homeHistory": "My meditations",
+  "homeSettings": "Settings",
+
+  "historyTitle": "My meditations",
+  "historyEmptyTitle": "No meditations yet",
+  "historyEmptyBody": "Sessions you attend will appear here once they finish.",
+  "historyLed": "You led",
+  "historyDuration": "{minutes, plural, =1{1 min} other{{minutes} min}}",
+  "@historyDuration": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "historyDurationUnknown": "Duration not recorded",
+  "historySummarySessions": "{count, plural, =1{1 session} other{{count} sessions}}",
+  "@historySummarySessions": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "historySummaryTime": "{hours}h {minutes}m total",
+  "@historySummaryTime": {
+    "placeholders": {
+      "hours": { "type": "int" },
+      "minutes": { "type": "int" }
+    }
+  },
+  "historyLoadMore": "Load more",
+
+  "settingsTitle": "Settings",
+  "settingsMuteTitle": "Silence notifications while meditating",
+  "settingsMuteBody": "Turns on Do Not Disturb when a meditation begins, and restores your previous settings when it ends. Alarms still ring.",
+  "settingsMuteUnsupported": "Not available on this device. iOS gives apps no way to control Focus or Do Not Disturb.",
+  "settingsMutePermissionNeeded": "Needs Do Not Disturb access",
+  "settingsMuteGrantAccess": "Grant access"
 }

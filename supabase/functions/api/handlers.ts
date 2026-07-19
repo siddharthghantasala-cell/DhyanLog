@@ -11,6 +11,9 @@ import { db } from "./db.ts";
 import {
   cleanString,
   optionalString,
+  pageLimit,
+  pageOffset,
+  safeFilterId,
   validLatitude,
   validLongitude,
   validShortCode,
@@ -303,6 +306,53 @@ export async function deleteAccount(
     auth_user_id: authUserId,
   });
   return json({ deleted: true });
+}
+
+/// The caller's own meditation history: sessions they attended, plus (for a
+/// preceptor) sessions they led, newest first.
+///
+/// Derived entirely from the existing one-row-per-session record — the
+/// `attendee_ids` array is matched with a GIN-indexed containment lookup, so no
+/// per-attendee table and no extra write path exists to keep in sync. The array
+/// itself is NEVER returned: callers get their own row's metadata and a count,
+/// never the identities of everyone else in the session.
+///
+/// Identity is taken from the verified token, never the body, so a member cannot
+/// request somebody else's history.
+export async function sessionHistory(
+  body: any,
+  member: Member,
+): Promise<Response> {
+  const id = member.heartfulnessId;
+  // Ids come from our own participants table, but they are interpolated into a
+  // PostgREST filter string below — validate rather than assume.
+  if (!safeFilterId(id)) {
+    return json({ error: "unsupported member id format" }, 400);
+  }
+  const limit = pageLimit(body.limit, 50, 200);
+  const offset = pageOffset(body.offset);
+
+  // One query, not two: `or` keeps offset/limit paging correct across both
+  // halves (paging two separate queries and merging them would drop rows).
+  // Postgres serves this as a BitmapOr over the gin + preceptor indexes.
+  const { data, error } = await db()
+    .from("meditation_sessions")
+    .select(
+      "id,preceptor_id,center_id,latitude,longitude,start_attendance_at," +
+        "meditation_start_at,meditation_end_at,status,attendee_count,short_code",
+    )
+    .or(`preceptor_id.eq.${id},attendee_ids.cs.{${id}}`)
+    .eq("status", "ended")
+    .order("start_attendance_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) return json({ error: error.message }, 500);
+
+  const sessions = (data ?? []).map((row: any) => ({
+    ...row,
+    // Lets the client label an entry "You led this" without a second lookup.
+    led: row.preceptor_id === id,
+  }));
+  return json({ sessions, limit, offset });
 }
 
 export async function getSession(buffer: Buffer, body: any): Promise<Response> {

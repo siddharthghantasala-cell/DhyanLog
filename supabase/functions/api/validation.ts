@@ -40,3 +40,27 @@ export function validShortCode(v: unknown): string | null {
   const t = v.trim().toUpperCase();
   return /^[A-Z0-9]{4,12}$/.test(t) ? t : null;
 }
+
+/// A page size clamped to [1, max]. Absent/garbage falls back to [fallback], so
+/// a client can never ask for an unbounded result set.
+export function pageLimit(v: unknown, fallback: number, max: number): number {
+  if (!isFiniteNumber(v)) return fallback;
+  const n = Math.floor(v);
+  if (n < 1) return fallback;
+  return Math.min(n, max);
+}
+
+/// A non-negative row offset; anything else is 0.
+export function pageOffset(v: unknown): number {
+  if (!isFiniteNumber(v)) return 0;
+  const n = Math.floor(v);
+  return n < 0 ? 0 : n;
+}
+
+/// True if a Heartfulness id is safe to interpolate into a PostgREST filter
+/// expression. Ids are issued by the org and are alphanumeric with separators;
+/// anything containing PostgREST's metacharacters (comma, parens, dot, braces)
+/// is rejected rather than escaped.
+export function safeFilterId(v: string): boolean {
+  return /^[A-Za-z0-9_-]{1,64}$/.test(v);
+}

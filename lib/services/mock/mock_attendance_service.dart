@@ -156,7 +156,9 @@ class MockAttendanceService implements AttendanceService {
     _store[sessionId] = finalized;
     _hot.remove(sessionId);
     _frozen.remove(sessionId);
-    _attendees.remove(sessionId);
+    // The attendee set is deliberately KEPT after the flush: it is the mock's
+    // stand-in for the persisted `attendee_ids` column, which is what personal
+    // history is queried from. (Redis evicts; Postgres doesn't.)
     _emit(finalized);
     await _controllers[sessionId]?.close();
     _controllers.remove(sessionId);
@@ -182,6 +184,22 @@ class MockAttendanceService implements AttendanceService {
   /// Exposed for verification / a future local dashboard.
   List<MeditationSession> get finalizedSessions =>
       List.unmodifiable(_store.values);
+
+  /// The persisted attendee identities of a finalized session — the mock's
+  /// `attendee_ids` column. Read by [MockHistoryService]; never surfaced to a
+  /// screen, which only ever sees counts.
+  Set<String> attendeesOf(String sessionId) =>
+      Set.unmodifiable(_attendees[sessionId] ?? const <String>{});
+
+  /// Insert an already-finished session, as if it had been flushed earlier.
+  /// Used to seed a believable history in demo/mock mode.
+  void seedFinalizedSession(
+    MeditationSession session,
+    Set<String> attendees,
+  ) {
+    _store[session.id] = session;
+    _attendees[session.id] = {...attendees};
+  }
 
   MeditationSession _requireHot(String sessionId) {
     final session = _hot[sessionId];

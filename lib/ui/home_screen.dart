@@ -9,7 +9,9 @@ import '../services/mock/seed_data.dart';
 import '../state/providers.dart';
 import 'abhyasi_attend_screen.dart';
 import 'error_presentation.dart';
+import 'history_screen.dart';
 import 'preceptor_session_screen.dart';
+import 'settings_screen.dart';
 
 /// Localized display name for a role.
 String roleLabel(AppLocalizations l10n, ParticipantRole role) {
@@ -65,6 +67,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Opportunistically record any attendance that was queued while offline.
     // Fire-and-forget; failures just leave items queued for next time.
     Future(() => ref.read(attendQueueProvider).flush()).ignore();
+    // If a previous run was killed mid-meditation it may have left the phone on
+    // Do Not Disturb. Restore it now — reaching home means no meditation of ours
+    // is running.
+    Future(() => ref.read(meditationMuteControllerProvider).reconcile())
+        .ignore();
   }
 
   Future<void> _onPrimaryAction(Participant me) async {
@@ -147,6 +154,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           PopupMenuButton<String>(
             onSelected: (value) {
               switch (value) {
+                case 'history':
+                  Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => const HistoryScreen(),
+                  ));
+                case 'settings':
+                  Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => const SettingsScreen(),
+                  ));
                 case 'logout':
                   ref.read(authServiceProvider).signOut();
                 case 'delete':
@@ -154,6 +169,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               }
             },
             itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'history',
+                child: ListTile(
+                  leading: const Icon(Icons.history),
+                  title: Text(l10n.homeHistory),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'settings',
+                child: ListTile(
+                  leading: const Icon(Icons.settings),
+                  title: Text(l10n.homeSettings),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuDivider(),
               PopupMenuItem(
                 value: 'logout',
                 child: ListTile(

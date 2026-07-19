@@ -406,6 +406,12 @@ abstract class AppLocalizations {
   /// **'Retry GPS'**
   String get attendRetryGps;
 
+  /// No description provided for @attendContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get attendContinue;
+
   /// No description provided for @attendNearbyHeader.
   ///
   /// In en, this message translates to:
@@ -501,6 +507,204 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copy join link'**
   String get sessionCopyJoinLink;
+
+  /// No description provided for @meditationWaitingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to begin'**
+  String get meditationWaitingTitle;
+
+  /// No description provided for @meditationWaitingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your attendance is recorded. Stay on this screen — your phone will be silenced as soon as the preceptor begins the meditation.'**
+  String get meditationWaitingBody;
+
+  /// No description provided for @meditationInProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Meditation in progress'**
+  String get meditationInProgressTitle;
+
+  /// No description provided for @meditationCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Meditation complete'**
+  String get meditationCompleteTitle;
+
+  /// No description provided for @meditationCompleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =0{Your sitting has ended.} =1{You meditated for 1 minute.} other{You meditated for {minutes} minutes.}}'**
+  String meditationCompleteBody(int minutes);
+
+  /// No description provided for @meditationAttendees.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 meditating} other{{count} meditating}}'**
+  String meditationAttendees(int count);
+
+  /// No description provided for @meditationMuted.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications silenced'**
+  String get meditationMuted;
+
+  /// No description provided for @meditationMuteOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications not silenced'**
+  String get meditationMuteOff;
+
+  /// No description provided for @meditationMuteDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Silencing is turned off in your settings.'**
+  String get meditationMuteDisabled;
+
+  /// No description provided for @meditationMuteUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS does not let apps silence notifications. Turn on a Focus mode to avoid interruptions.'**
+  String get meditationMuteUnsupported;
+
+  /// No description provided for @meditationMutePermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow DhyanLog to silence notifications during meditation.'**
+  String get meditationMutePermission;
+
+  /// No description provided for @meditationMuteGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get meditationMuteGrant;
+
+  /// No description provided for @meditationLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get meditationLeave;
+
+  /// No description provided for @meditationLeaveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave this screen?'**
+  String get meditationLeaveTitle;
+
+  /// No description provided for @meditationLeaveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your attendance is already recorded and will not be lost. Leaving restores your notifications.'**
+  String get meditationLeaveBody;
+
+  /// No description provided for @meditationBackHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to home'**
+  String get meditationBackHome;
+
+  /// No description provided for @homeHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'My meditations'**
+  String get homeHistory;
+
+  /// No description provided for @homeSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get homeSettings;
+
+  /// No description provided for @historyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My meditations'**
+  String get historyTitle;
+
+  /// No description provided for @historyEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No meditations yet'**
+  String get historyEmptyTitle;
+
+  /// No description provided for @historyEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Sessions you attend will appear here once they finish.'**
+  String get historyEmptyBody;
+
+  /// No description provided for @historyLed.
+  ///
+  /// In en, this message translates to:
+  /// **'You led'**
+  String get historyLed;
+
+  /// No description provided for @historyDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =1{1 min} other{{minutes} min}}'**
+  String historyDuration(int minutes);
+
+  /// No description provided for @historyDurationUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration not recorded'**
+  String get historyDurationUnknown;
+
+  /// No description provided for @historySummarySessions.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 session} other{{count} sessions}}'**
+  String historySummarySessions(int count);
+
+  /// No description provided for @historySummaryTime.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours}h {minutes}m total'**
+  String historySummaryTime(int hours, int minutes);
+
+  /// No description provided for @historyLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get historyLoadMore;
+
+  /// No description provided for @settingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
+
+  /// No description provided for @settingsMuteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Silence notifications while meditating'**
+  String get settingsMuteTitle;
+
+  /// No description provided for @settingsMuteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Turns on Do Not Disturb when a meditation begins, and restores your previous settings when it ends. Alarms still ring.'**
+  String get settingsMuteBody;
+
+  /// No description provided for @settingsMuteUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available on this device. iOS gives apps no way to control Focus or Do Not Disturb.'**
+  String get settingsMuteUnsupported;
+
+  /// No description provided for @settingsMutePermissionNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs Do Not Disturb access'**
+  String get settingsMutePermissionNeeded;
+
+  /// No description provided for @settingsMuteGrantAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant access'**
+  String get settingsMuteGrantAccess;
 }
 
 class _AppLocalizationsDelegate

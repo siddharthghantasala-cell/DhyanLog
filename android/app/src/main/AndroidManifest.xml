@@ -3,6 +3,11 @@
          attendance to match the member to a nearby session. No background use. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <!-- Do Not Disturb control: lets the app silence notifications for the
+         duration of a meditation and restore the previous state afterwards.
+         Requires a separate one-time "DND access" grant the user makes in
+         system settings; declaring it alone grants nothing. -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
     <application
         android:label="dhyanlog"
         android:name="${applicationName}"

@@ -77,6 +77,9 @@ export function requiredAuth(route: string): AuthLevel {
     case "auth/me":
     case "attend":
     case "sessions/get":
+    // History is scoped to the caller's own verified identity inside the
+    // handler, so any member may call it.
+    case "sessions/history":
     case "account/delete":
       return "member";
     default:

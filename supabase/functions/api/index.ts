@@ -21,6 +21,7 @@ import {
   getSession,
   meditationStart,
   meditationStop,
+  sessionHistory,
   startSession,
 } from "./handlers.ts";
 import { me, requestOtp, verifyOtp } from "./otp.ts";
@@ -108,6 +109,8 @@ Deno.serve(async (req) => {
         return finish(await meditationStop(Buffer.fromEnv(), body, member!));
       case "sessions/get":
         return finish(await getSession(Buffer.fromEnv(), body));
+      case "sessions/history":
+        return finish(await sessionHistory(body, member!));
       case "account/delete": {
         // Delete the app login keyed by the verified `sub` (the auth user id).
         const authUserId = claims?.sub;

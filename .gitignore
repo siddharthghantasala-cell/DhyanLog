@@ -46,6 +46,7 @@ app.*.map.json
 
 # Local run helper (contains anon key)
 run_on_phone.ps1
+build_apk_for_phone.ps1
 
 # Contains the Supabase personal access token
 .env

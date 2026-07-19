@@ -182,6 +182,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get attendRetryGps => 'Retry GPS';
 
   @override
+  String get attendContinue => 'Continue';
+
+  @override
   String get attendNearbyHeader => 'Sessions detected near you:';
 
   @override
@@ -254,4 +257,146 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sessionCopyJoinLink => 'Copy join link';
+
+  @override
+  String get meditationWaitingTitle => 'Waiting to begin';
+
+  @override
+  String get meditationWaitingBody =>
+      'Your attendance is recorded. Stay on this screen — your phone will be silenced as soon as the preceptor begins the meditation.';
+
+  @override
+  String get meditationInProgressTitle => 'Meditation in progress';
+
+  @override
+  String get meditationCompleteTitle => 'Meditation complete';
+
+  @override
+  String meditationCompleteBody(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'You meditated for $minutes minutes.',
+      one: 'You meditated for 1 minute.',
+      zero: 'Your sitting has ended.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String meditationAttendees(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count meditating',
+      one: '1 meditating',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get meditationMuted => 'Notifications silenced';
+
+  @override
+  String get meditationMuteOff => 'Notifications not silenced';
+
+  @override
+  String get meditationMuteDisabled =>
+      'Silencing is turned off in your settings.';
+
+  @override
+  String get meditationMuteUnsupported =>
+      'iOS does not let apps silence notifications. Turn on a Focus mode to avoid interruptions.';
+
+  @override
+  String get meditationMutePermission =>
+      'Allow DhyanLog to silence notifications during meditation.';
+
+  @override
+  String get meditationMuteGrant => 'Allow';
+
+  @override
+  String get meditationLeave => 'Leave';
+
+  @override
+  String get meditationLeaveTitle => 'Leave this screen?';
+
+  @override
+  String get meditationLeaveBody =>
+      'Your attendance is already recorded and will not be lost. Leaving restores your notifications.';
+
+  @override
+  String get meditationBackHome => 'Back to home';
+
+  @override
+  String get homeHistory => 'My meditations';
+
+  @override
+  String get homeSettings => 'Settings';
+
+  @override
+  String get historyTitle => 'My meditations';
+
+  @override
+  String get historyEmptyTitle => 'No meditations yet';
+
+  @override
+  String get historyEmptyBody =>
+      'Sessions you attend will appear here once they finish.';
+
+  @override
+  String get historyLed => 'You led';
+
+  @override
+  String historyDuration(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: '$minutes min',
+      one: '1 min',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get historyDurationUnknown => 'Duration not recorded';
+
+  @override
+  String historySummarySessions(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sessions',
+      one: '1 session',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String historySummaryTime(int hours, int minutes) {
+    return '${hours}h ${minutes}m total';
+  }
+
+  @override
+  String get historyLoadMore => 'Load more';
+
+  @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get settingsMuteTitle => 'Silence notifications while meditating';
+
+  @override
+  String get settingsMuteBody =>
+      'Turns on Do Not Disturb when a meditation begins, and restores your previous settings when it ends. Alarms still ring.';
+
+  @override
+  String get settingsMuteUnsupported =>
+      'Not available on this device. iOS gives apps no way to control Focus or Do Not Disturb.';
+
+  @override
+  String get settingsMutePermissionNeeded => 'Needs Do Not Disturb access';
+
+  @override
+  String get settingsMuteGrantAccess => 'Grant access';
 }

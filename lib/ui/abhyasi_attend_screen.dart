@@ -7,6 +7,7 @@ import '../models/pending_attend.dart';
 import '../services/http/api_client.dart';
 import '../state/providers.dart';
 import 'error_presentation.dart';
+import 'meditation_in_progress_screen.dart';
 
 /// Abhyasi "give attendance" flow: try GPS match first, fall back to a typed
 /// short code / scanned link when the match is ambiguous or empty.
@@ -173,6 +174,7 @@ class _AbhyasiAttendScreenState extends ConsumerState<AbhyasiAttendScreen> {
 
     if (result.isSuccess) {
       final joinedNew = result.outcome == AttendOutcome.joined;
+      final session = result.session;
       return _Centered(
         icon: Icons.check_circle,
         color: Colors.green,
@@ -180,9 +182,19 @@ class _AbhyasiAttendScreenState extends ConsumerState<AbhyasiAttendScreen> {
         message: joinedNew
             ? l10n.attendRecordedMessage
             : l10n.attendAlreadyMessage,
+        // Hand off to the meditation screen, which watches the session and
+        // silences the phone once the preceptor begins. Replaces this route so
+        // "back" from there returns home, not to a stale result.
         action: FilledButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l10n.commonDone),
+          onPressed: session == null
+              ? () => Navigator.of(context).pop()
+              : () => Navigator.of(context).pushReplacement(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          MeditationInProgressScreen(sessionId: session.id),
+                    ),
+                  ),
+          child: Text(session == null ? l10n.commonDone : l10n.attendContinue),
         ),
       );
     }
