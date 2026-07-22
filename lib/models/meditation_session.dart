@@ -14,6 +14,23 @@ enum SessionStatus {
   }
 }
 
+/// How a session's attendance radius is decided:
+///   * satsang — held at a registered center; radius comes from the center and
+///     the match circle is centered on the center (crowds of 15–70,000+).
+///   * regular — a home sitting; anchored on the preceptor's GPS with a tight
+///     default radius (a handful of people).
+enum SessionType {
+  satsang,
+  regular;
+
+  static SessionType fromString(String? value) {
+    return SessionType.values.firstWhere(
+      (t) => t.name == value,
+      orElse: () => SessionType.regular,
+    );
+  }
+}
+
 /// A meditation session — this single object is both the live "buffer packet"
 /// (while open) and the finalized record (once ended). The attendee *identities*
 /// live only in the hot buffer (Redis) and are written once, as an
@@ -33,6 +50,8 @@ class MeditationSession {
     required this.status,
     required this.attendeeCount,
     required this.shortCode,
+    this.type = SessionType.regular,
+    this.matchRadiusMeters = 30,
   });
 
   final String id;
@@ -44,6 +63,12 @@ class MeditationSession {
   final DateTime? meditationStartAt;
   final DateTime? meditationEndAt;
   final SessionStatus status;
+
+  /// satsang (center-anchored, center radius) vs regular (home, GPS + default).
+  final SessionType type;
+
+  /// The distance (metres) within which an abhyasi joins this session.
+  final int matchRadiusMeters;
 
   /// Number of de-duplicated attendees so far. The identities themselves are not
   /// sent to clients — only this count.
@@ -73,6 +98,8 @@ class MeditationSession {
       status: status ?? this.status,
       attendeeCount: attendeeCount ?? this.attendeeCount,
       shortCode: shortCode,
+      type: type,
+      matchRadiusMeters: matchRadiusMeters,
     );
   }
 
@@ -98,6 +125,8 @@ class MeditationSession {
       status: SessionStatus.fromString(json['status'] as String? ?? 'collecting'),
       attendeeCount: count,
       shortCode: json['short_code'] as String? ?? '',
+      type: SessionType.fromString(json['type'] as String?),
+      matchRadiusMeters: (json['match_radius_meters'] as num?)?.toInt() ?? 30,
     );
   }
 
@@ -114,6 +143,8 @@ class MeditationSession {
       'status': status.name,
       'attendee_count': attendeeCount,
       'short_code': shortCode,
+      'type': type.name,
+      'match_radius_meters': matchRadiusMeters,
     };
   }
 }

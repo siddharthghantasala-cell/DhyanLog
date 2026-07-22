@@ -14,6 +14,8 @@ const base: SessionMeta = {
   status: "collecting",
   shortCode: "K7M2PQ",
   frozen: true,
+  type: "satsang",
+  matchRadiusMeters: 500,
 };
 
 Deno.test("metaToRow captures the attendees and count", () => {
@@ -42,6 +44,20 @@ Deno.test("rowToMeta marks a session meditating once a start time is set", () =>
   const meta = rowToMeta(metaToRow(meditating, ["A"]));
   assertEquals(meta.status, "meditating");
   assertEquals(meta.meditationStartAt, "2026-07-01T10:20:00.000Z");
+});
+
+Deno.test("meta -> row -> meta preserves the session type and radius", () => {
+  const meta = rowToMeta(metaToRow(base, ["A"]));
+  assertEquals(meta.type, "satsang");
+  assertEquals(meta.matchRadiusMeters, 500);
+});
+
+Deno.test("rowToMeta defaults type/radius for a legacy checkpoint", () => {
+  // A checkpoint written before these columns existed comes back with nulls.
+  const legacy = { ...metaToRow(base, ["A"]), type: null, match_radius_meters: null };
+  const meta = rowToMeta(legacy);
+  assertEquals(meta.type, "regular");
+  assertEquals(meta.matchRadiusMeters, 30);
 });
 
 Deno.test("meta -> row -> meta preserves ownership + location fields", () => {

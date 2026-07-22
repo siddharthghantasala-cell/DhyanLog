@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/app_config.dart';
 import '../l10n/app_localizations.dart';
 import '../services/auth/auth_service.dart';
 import '../state/providers.dart';
@@ -30,6 +31,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _idController.dispose();
     _codeController.dispose();
     super.dispose();
+  }
+
+  /// DEV one-step sign-in: just the Heartfulness ID, no code.
+  Future<void> _devSignIn() async {
+    final l10n = AppLocalizations.of(context)!;
+    final id = _idController.text.trim();
+    if (id.isEmpty) {
+      setState(() => _error = l10n.loginEnterId);
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      // On success authStateProvider updates and the app swaps to home.
+      await ref.read(authServiceProvider).signInWithId(id);
+    } on AuthException catch (e) {
+      _showError(e.message);
+    } catch (_) {
+      _showError(l10n.commonSomethingWrong);
+    }
   }
 
   Future<void> _sendCode() async {
@@ -128,7 +151,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
-                  if (!onChallenge)
+                  if (AppConfig.devAuth)
+                    ..._buildDevStep(context, l10n)
+                  else if (!onChallenge)
                     ..._buildIdStep(context, l10n)
                   else
                     ..._buildCodeStep(context, l10n),
@@ -139,6 +164,49 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       ),
     );
+  }
+
+  /// DEV MVP sign-in: a single Heartfulness-ID field, no OTP step.
+  List<Widget> _buildDevStep(BuildContext context, AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    return [
+      Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: scheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          'MVP mode — sign in with your Heartfulness ID',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: scheme.onSecondaryContainer,
+              ),
+        ),
+      ),
+      const SizedBox(height: AppSpacing.lg),
+      TextField(
+        controller: _idController,
+        textInputAction: TextInputAction.go,
+        autocorrect: false,
+        onSubmitted: (_) => _devSignIn(),
+        decoration: InputDecoration(
+          labelText: l10n.loginIdLabel,
+          hintText: 'HFN-ABHY-001',
+          border: const OutlineInputBorder(),
+          errorText: _error,
+          prefixIcon: const Icon(Icons.badge_outlined),
+        ),
+      ),
+      const SizedBox(height: AppSpacing.lg),
+      FilledButton(
+        onPressed: _loading ? null : _devSignIn,
+        child: _loading ? const _Spinner() : Text(l10n.loginVerify),
+      ),
+    ];
   }
 
   List<Widget> _buildIdStep(BuildContext context, AppLocalizations l10n) {

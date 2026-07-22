@@ -1,5 +1,9 @@
 import { SupabaseClient } from "./deps.ts";
-import { SessionMeta } from "./buffer.ts";
+import {
+  DEFAULT_REGULAR_RADIUS_METERS,
+  SessionMeta,
+  type SessionType,
+} from "./buffer.ts";
 
 /// Durability checkpoint for an in-flight session. Written when attendance is
 /// ended and when meditation starts, so that if Redis loses the session before
@@ -17,6 +21,8 @@ export interface CheckpointRow {
   short_code: string;
   attendee_ids: string[];
   attendee_count: number;
+  type: SessionType | null;
+  match_radius_meters: number | null;
 }
 
 /// Snapshot -> row. Pure, so the mapping is unit-testable without a DB.
@@ -35,6 +41,8 @@ export function metaToRow(
     short_code: meta.shortCode,
     attendee_ids: attendees,
     attendee_count: attendees.length,
+    type: meta.type,
+    match_radius_meters: meta.matchRadiusMeters,
   };
 }
 
@@ -54,6 +62,9 @@ export function rowToMeta(row: CheckpointRow): SessionMeta {
     status: row.meditation_start_at ? "meditating" : "collecting",
     shortCode: row.short_code,
     frozen: true,
+    // Legacy checkpoints predate these; fall back to a safe regular default.
+    type: row.type ?? "regular",
+    matchRadiusMeters: row.match_radius_meters ?? DEFAULT_REGULAR_RADIUS_METERS,
   };
 }
 
@@ -82,7 +93,8 @@ export async function readCheckpoint(
     .from("session_checkpoints")
     .select(
       "id,preceptor_id,center_id,latitude,longitude,start_attendance_at," +
-        "meditation_start_at,short_code,attendee_ids,attendee_count",
+        "meditation_start_at,short_code,attendee_ids,attendee_count," +
+        "type,match_radius_meters",
     )
     .eq("id", id)
     .maybeSingle();

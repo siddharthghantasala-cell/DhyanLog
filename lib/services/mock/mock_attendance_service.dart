@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:math';
 
 import '../../models/attend_result.dart';
+import '../../models/meditation_center.dart';
 import '../../models/meditation_session.dart';
 import '../../util/geo.dart';
 import '../attendance_service.dart';
+import 'seed_data.dart';
 
 /// In-memory stand-in for the Redis buffer + Edge Functions + Postgres flush.
 ///
@@ -16,11 +18,13 @@ import '../attendance_service.dart';
 /// sessions within [matchRadiusMeters] and the time window are candidates.
 class MockAttendanceService implements AttendanceService {
   MockAttendanceService({
-    this.matchRadiusMeters = 200,
+    this.regularRadiusMeters = 30,
     this.matchWindow = const Duration(hours: 3),
   });
 
-  final double matchRadiusMeters;
+  /// Default capture radius for a regular (home) session — mirrors the backend's
+  /// DEFAULT_REGULAR_RADIUS_METERS. A satsang uses its center's radius instead.
+  final double regularRadiusMeters;
   final Duration matchWindow;
 
   final Map<String, MeditationSession> _hot = {};
@@ -42,6 +46,17 @@ class MockAttendanceService implements AttendanceService {
     required double longitude,
   }) async {
     final id = _generateId();
+    // Mirror the backend: a center id -> satsang with that center's radius; no
+    // center -> regular with the tight default. (The caller already passes the
+    // center's coords as lat/lng for a satsang, so the anchor is correct.)
+    final center = centerId == null
+        ? null
+        : SeedData.centers
+            .cast<MeditationCenter?>()
+            .firstWhere((c) => c?.id == centerId, orElse: () => null);
+    final type = centerId != null ? SessionType.satsang : SessionType.regular;
+    final radius = center?.checkRadiusMeters ??
+        (centerId != null ? 200 : regularRadiusMeters.round());
     final session = MeditationSession(
       id: id,
       preceptorId: preceptorId,
@@ -54,6 +69,8 @@ class MockAttendanceService implements AttendanceService {
       status: SessionStatus.collecting,
       attendeeCount: 0,
       shortCode: _generateCode(),
+      type: type,
+      matchRadiusMeters: radius,
     );
     _hot[id] = session;
     _attendees[id] = <String>{};
@@ -72,8 +89,9 @@ class MockAttendanceService implements AttendanceService {
       if (_frozen.contains(s.id)) return false;
       if (s.status != SessionStatus.collecting) return false;
       if (now.difference(s.startAttendanceAt) > matchWindow) return false;
+      // Each session matches within its own radius (satsang vs regular).
       return distanceMeters(latitude, longitude, s.latitude, s.longitude) <=
-          matchRadiusMeters;
+          s.matchRadiusMeters.toDouble();
     }).toList();
 
     if (candidates.isEmpty) {

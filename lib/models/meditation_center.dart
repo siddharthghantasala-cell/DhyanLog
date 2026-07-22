@@ -7,6 +7,7 @@ class MeditationCenter {
     required this.latitude,
     required this.longitude,
     required this.address,
+    this.checkRadiusMeters = 200,
   });
 
   final String id;
@@ -15,6 +16,12 @@ class MeditationCenter {
   final double longitude;
   final String address;
 
+  /// The distance (metres) within which an abhyasi is considered present at this
+  /// center's satsang. Owned server-side (the `meditation_centers` table); large
+  /// venues (an auditorium ground) run into the kilometres, small halls a few
+  /// hundred metres.
+  final int checkRadiusMeters;
+
   factory MeditationCenter.fromJson(Map<String, dynamic> json) {
     return MeditationCenter(
       id: json['id'] as String,
@@ -22,6 +29,7 @@ class MeditationCenter {
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
       address: json['address'] as String? ?? '',
+      checkRadiusMeters: (json['check_radius_meters'] as num?)?.toInt() ?? 200,
     );
   }
 
@@ -32,6 +40,7 @@ class MeditationCenter {
       'latitude': latitude,
       'longitude': longitude,
       'address': address,
+      'check_radius_meters': checkRadiusMeters,
     };
   }
 }

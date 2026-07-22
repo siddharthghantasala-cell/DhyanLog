@@ -5,12 +5,16 @@ import {
   authorize,
   bearerToken,
   decodeJwt,
+  devAuthHeartfulnessId,
   isAuthenticated,
+  type JwtClaims,
   type Member,
   requiredAuth,
   resolveMemberByEmail,
+  resolveMemberById,
 } from "./auth.ts";
 import { Buffer } from "./buffer.ts";
+import { listCenters } from "./centers.ts";
 import { corsHeaders, json, resolveAllowOrigin } from "./cors.ts";
 import { db } from "./db.ts";
 import { logRequest } from "./log.ts";
@@ -58,9 +62,22 @@ Deno.serve(async (req) => {
   // role looked up from their verified email (never from client-sent ids).
   const level = requiredAuth(path);
   const token = bearerToken(req);
-  const claims = token ? decodeJwt(token) : null;
+  let claims: JwtClaims | null = token ? decodeJwt(token) : null;
   let member: Member | null = null;
-  if (level !== "public" && isAuthenticated(claims)) {
+  // DEV-ONLY bypass (inert unless DEV_AUTH_SECRET is set): trust the caller's
+  // Heartfulness ID from the header and synthesize authenticated claims so the
+  // normal `authorize` path treats it as a real signed-in member.
+  const devHid = level === "public" ? null : devAuthHeartfulnessId(req);
+  if (devHid) {
+    member = await resolveMemberById(db(), devHid);
+    if (member) {
+      claims = {
+        role: "authenticated",
+        email: `dev+${member.heartfulnessId}`,
+        sub: `dev-${member.heartfulnessId}`,
+      };
+    }
+  } else if (level !== "public" && isAuthenticated(claims)) {
     member = await resolveMemberByEmail(db(), claims.email);
   }
 
@@ -109,6 +126,8 @@ Deno.serve(async (req) => {
         return finish(await meditationStop(Buffer.fromEnv(), body, member!));
       case "sessions/get":
         return finish(await getSession(Buffer.fromEnv(), body));
+      case "centers/list":
+        return finish(await listCenters());
       case "sessions/history":
         return finish(await sessionHistory(body, member!));
       case "account/delete": {

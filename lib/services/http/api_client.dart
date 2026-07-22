@@ -42,12 +42,14 @@ class ApiClient {
     required this.baseUrl,
     required this.anonKey,
     String? Function()? accessToken,
+    Map<String, String> Function()? extraHeaders,
     http.Client? client,
     this.timeout = const Duration(seconds: 15),
     this.maxRetries = 2,
     Future<void> Function(Duration)? sleep,
     Random? random,
   })  : _accessToken = accessToken,
+        _extraHeaders = extraHeaders,
         _client = client ?? http.Client(),
         _sleep = sleep ?? Future.delayed,
         _random = random ?? Random();
@@ -60,6 +62,10 @@ class ApiClient {
   final int maxRetries;
 
   final String? Function()? _accessToken;
+
+  /// Extra headers attached to every request, read fresh at call time. Used by
+  /// the dev-auth seam to send the caller's Heartfulness ID; empty otherwise.
+  final Map<String, String> Function()? _extraHeaders;
   final http.Client _client;
   final Future<void> Function(Duration) _sleep;
   final Random _random;
@@ -108,6 +114,7 @@ class ApiClient {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $bearer',
               'apikey': anonKey,
+              ...?_extraHeaders?.call(),
             },
             body: jsonEncode(body),
           )

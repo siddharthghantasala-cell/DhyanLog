@@ -15,6 +15,15 @@ class AppConfig {
 
   static String get apiBaseUrl => '$supabaseUrl/functions/v1/api';
 
+  /// DEV-ONLY: shared secret matching the backend's `DEV_AUTH_SECRET`. When set
+  /// (via --dart-define), sign-in is a single-step Heartfulness-ID login with no
+  /// OTP/email — the client sends the id in a header the backend trusts. Empty
+  /// (the default) leaves the normal OTP/SSO auth in place. Requires the real
+  /// backend to be configured too (so writes still land in the database).
+  static const String devAuthSecret = String.fromEnvironment('DEV_AUTH_SECRET');
+
+  static bool get devAuth => devAuthSecret.isNotEmpty && useRealBackend;
+
   /// Sentry DSN for crash/error reporting. When empty (default), telemetry is a
   /// no-op — the app builds and runs with no external reporting configured.
   static const String sentryDsn = String.fromEnvironment('SENTRY_DSN');

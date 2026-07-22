@@ -218,6 +218,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: 16),
               _LocationPicker(
                 value: _center,
+                centers:
+                    ref.watch(centersProvider).valueOrNull ?? SeedData.centers,
                 onChanged: (c) => setState(() => _center = c),
               ),
               const Spacer(),
@@ -258,10 +260,17 @@ class _Greeting extends StatelessWidget {
 }
 
 class _LocationPicker extends StatelessWidget {
-  const _LocationPicker({required this.value, required this.onChanged});
+  const _LocationPicker({
+    required this.value,
+    required this.centers,
+    required this.onChanged,
+  });
 
   /// The picked center, or null for the device's real GPS position.
   final MeditationCenter? value;
+
+  /// Centers to offer (a satsang venue). Server-backed; falls back to seeds.
+  final List<MeditationCenter> centers;
   final ValueChanged<MeditationCenter?> onChanged;
 
   // DropdownButton renders its hint for a null value, so GPS gets a string
@@ -285,13 +294,13 @@ class _LocationPicker extends StatelessWidget {
           value: value?.id ?? _gps,
           items: [
             DropdownMenuItem(value: _gps, child: Text(l10n.homeLocationGps)),
-            for (final c in SeedData.centers)
+            for (final c in centers)
               DropdownMenuItem(value: c.id, child: Text(c.name)),
           ],
           onChanged: (id) => onChanged(
             id == null || id == _gps
                 ? null
-                : SeedData.centers.firstWhere((c) => c.id == id),
+                : centers.firstWhere((c) => c.id == id),
           ),
         ),
       ),

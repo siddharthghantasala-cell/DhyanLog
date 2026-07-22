@@ -1,6 +1,13 @@
 import { type AuditAction, recordAudit } from "./audit.ts";
 import { type Member } from "./auth.ts";
-import { Buffer, SessionMeta } from "./buffer.ts";
+import {
+  Buffer,
+  DEFAULT_REGULAR_RADIUS_METERS,
+  MAX_RADIUS_METERS,
+  SessionMeta,
+  type SessionType,
+} from "./buffer.ts";
+import { getCenter } from "./centers.ts";
 import {
   deleteCheckpoint,
   readCheckpoint,
@@ -97,6 +104,8 @@ function sessionDto(meta: SessionMeta, attendeeCount: number) {
     status: meta.status,
     attendee_count: attendeeCount,
     short_code: meta.shortCode,
+    type: meta.type,
+    match_radius_meters: meta.matchRadiusMeters,
   };
 }
 
@@ -105,27 +114,57 @@ export async function startSession(
   body: any,
   member: Member,
 ): Promise<Response> {
-  if (!validLatitude(body.latitude) || !validLongitude(body.longitude)) {
-    return json({ error: "valid latitude and longitude required" }, 400);
-  }
   const centerId = optionalString(body.centerId, 64);
   if (centerId === null) return json({ error: "invalid centerId" }, 400);
+
+  // The session's type, anchor, and radius are all decided here (server-side),
+  // never trusted from the client:
+  //   * a center id  -> satsang: anchor on the CENTER, radius from the center.
+  //   * no center id -> regular: anchor on the preceptor's GPS, tight default.
+  let type: SessionType;
+  let anchorLat: number;
+  let anchorLng: number;
+  let radius: number;
+  if (centerId) {
+    const center = await getCenter(db(), centerId);
+    if (!center) return json({ error: "unknown center" }, 400);
+    type = "satsang";
+    anchorLat = center.latitude;
+    anchorLng = center.longitude;
+    radius = center.checkRadiusMeters;
+  } else {
+    if (!validLatitude(body.latitude) || !validLongitude(body.longitude)) {
+      return json({ error: "valid latitude and longitude required" }, 400);
+    }
+    type = "regular";
+    anchorLat = body.latitude;
+    anchorLng = body.longitude;
+    radius = DEFAULT_REGULAR_RADIUS_METERS;
+  }
+  // Clamp to a sane band: never below the regular default, never above the cap
+  // that keeps matches inside the geo-bucket coverage.
+  radius = Math.min(
+    Math.max(Math.round(radius), DEFAULT_REGULAR_RADIUS_METERS),
+    MAX_RADIUS_METERS,
+  );
 
   const meta: SessionMeta = {
     id: generateId(),
     preceptorId: member.heartfulnessId, // from the verified token, not the body
     centerId: centerId ?? null,
-    latitude: body.latitude,
-    longitude: body.longitude,
+    latitude: anchorLat,
+    longitude: anchorLng,
     startAttendanceAt: new Date().toISOString(),
     meditationStartAt: null,
     meditationEndAt: null,
     status: "collecting",
     shortCode: generateCode(),
     frozen: false,
+    type,
+    matchRadiusMeters: radius,
   };
   await buffer.createSession(meta);
-  await audit(member, "session_start", meta.id);
+  await audit(member, "session_start", meta.id, { type, radius });
   return json(sessionDto(meta, 0));
 }
 
@@ -279,6 +318,8 @@ export async function meditationStop(
     attendee_ids: attendees,
     attendee_count: attendees.length,
     short_code: finalized.shortCode,
+    type: finalized.type ?? null,
+    match_radius_meters: finalized.matchRadiusMeters ?? null,
   });
   if (error) return json({ error: error.message }, 500);
 

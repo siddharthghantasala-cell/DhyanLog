@@ -7,6 +7,7 @@ import {
   bearerToken,
   canLead,
   decodeJwt,
+  devAuthHeartfulnessId,
   isAuthenticated,
   type JwtClaims,
   type Member,
@@ -88,4 +89,47 @@ Deno.test("authorize: leader requires a leading role", () => {
   assertEquals(authorize("leader", user, abhyasi).status, 403);
   assertEquals(authorize("leader", user, preceptor).ok, true);
   assertEquals(authorize("leader", user, master).ok, true);
+});
+
+Deno.test("devAuthHeartfulnessId: inert unless DEV_AUTH_SECRET is set", () => {
+  Deno.env.delete("DEV_AUTH_SECRET");
+  const req = new Request("https://x/api/sessions/start", {
+    headers: { "x-dev-secret": "s3cret", "x-dev-hid": "HFN-ABHY-001" },
+  });
+  assertEquals(devAuthHeartfulnessId(req), null);
+});
+
+Deno.test("devAuthHeartfulnessId: needs a matching secret + non-empty id", () => {
+  Deno.env.set("DEV_AUTH_SECRET", "s3cret");
+  try {
+    // Wrong secret -> rejected.
+    assertEquals(
+      devAuthHeartfulnessId(
+        new Request("https://x/api/sessions/start", {
+          headers: { "x-dev-secret": "nope", "x-dev-hid": "HFN-ABHY-001" },
+        }),
+      ),
+      null,
+    );
+    // No id -> rejected even with the right secret.
+    assertEquals(
+      devAuthHeartfulnessId(
+        new Request("https://x/api/sessions/start", {
+          headers: { "x-dev-secret": "s3cret" },
+        }),
+      ),
+      null,
+    );
+    // Right secret + id -> trusted, trimmed.
+    assertEquals(
+      devAuthHeartfulnessId(
+        new Request("https://x/api/sessions/start", {
+          headers: { "x-dev-secret": "s3cret", "x-dev-hid": " HFN-ABHY-001 " },
+        }),
+      ),
+      "HFN-ABHY-001",
+    );
+  } finally {
+    Deno.env.delete("DEV_AUTH_SECRET");
+  }
 });

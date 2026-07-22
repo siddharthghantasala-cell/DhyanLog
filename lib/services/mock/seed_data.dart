@@ -71,6 +71,7 @@ class SeedData {
       latitude: 13.0827,
       longitude: 80.2707,
       address: 'Chennai, Tamil Nadu',
+      checkRadiusMeters: 500,
     ),
     MeditationCenter(
       id: 'CTR-PAR-01',
@@ -78,6 +79,7 @@ class SeedData {
       latitude: 48.8566,
       longitude: 2.3522,
       address: 'Paris, France',
+      checkRadiusMeters: 300,
     ),
     MeditationCenter(
       id: 'CTR-KANHA',
@@ -85,6 +87,7 @@ class SeedData {
       latitude: 17.1860,
       longitude: 78.2050,
       address: 'Hyderabad, Telangana',
+      checkRadiusMeters: 2000,
     ),
   ];
 }

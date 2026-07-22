@@ -121,3 +121,36 @@ export async function resolveMemberByEmail(
   if (error || !data) return null;
   return { heartfulnessId: data.heartfulness_id, role: data.role };
 }
+
+/// Resolve a member directly by Heartfulness ID. Used ONLY by the dev-auth
+/// bypass below — the normal path never trusts a client-sent id.
+export async function resolveMemberById(
+  db: SupabaseClient,
+  heartfulnessId: string,
+): Promise<Member | null> {
+  const { data, error } = await db
+    .from("participants")
+    .select("heartfulness_id,role")
+    .ilike("heartfulness_id", heartfulnessId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return { heartfulnessId: data.heartfulness_id, role: data.role };
+}
+
+/// DEV-ONLY sign-in bypass. Returns the Heartfulness ID the caller claims via
+/// the `x-dev-hid` header — but ONLY when `DEV_AUTH_SECRET` is set on the
+/// function AND the request carries a matching `x-dev-secret` header. This
+/// deliberately trades the production identity guarantee (authorize off a
+/// verified email, never a client-sent id) for a frictionless MVP login where
+/// a member signs in with just their Heartfulness ID.
+///
+/// It is INERT in production: with no `DEV_AUTH_SECRET` env var set, this always
+/// returns null and the normal verified-token path is the only way in.
+export function devAuthHeartfulnessId(req: Request): string | null {
+  const secret = Deno.env.get("DEV_AUTH_SECRET");
+  if (!secret) return null; // dev auth disabled — the prod default
+  const provided = req.headers.get("x-dev-secret");
+  if (!provided || provided !== secret) return null;
+  const hid = (req.headers.get("x-dev-hid") ?? "").trim();
+  return hid.length > 0 ? hid : null;
+}

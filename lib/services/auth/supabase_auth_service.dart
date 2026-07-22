@@ -102,6 +102,13 @@ class SupabaseAuthService implements AuthService {
   }
 
   @override
+  Future<AuthSession> signInWithId(String heartfulnessId) =>
+      throw const AuthException('Dev sign-in is not enabled.');
+
+  @override
+  String? get devHeartfulnessId => null;
+
+  @override
   Future<void> signOut() async {
     await _gateway.signOut();
     _pendingId = null;

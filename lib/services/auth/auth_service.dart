@@ -37,6 +37,17 @@ abstract class AuthService {
   /// does not persist, so it returns null.
   Future<AuthSession?> restoreSession();
 
+  /// One-step DEV sign-in by Heartfulness ID — no OTP, no password. Only
+  /// [DevAuthService] implements this (behind the `DEV_AUTH_SECRET` flag); the
+  /// OTP/SSO providers reject it. Kept off the main flow so production sign-in
+  /// stays the verified-token path.
+  Future<AuthSession> signInWithId(String heartfulnessId) =>
+      throw const AuthException('Dev sign-in is not enabled.');
+
+  /// The Heartfulness ID the dev-auth client sends to the backend as its
+  /// identity. Null for every non-dev provider (they authorize off a token).
+  String? get devHeartfulnessId => null;
+
   /// Step 1 of sign-in: the member identifies themselves by Heartfulness ID; we
   /// send a one-time passcode to the contact (email/phone) on their participant
   /// record. Returns the [OtpChallenge] to show. Throws [AuthException] if no

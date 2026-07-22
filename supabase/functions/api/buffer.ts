@@ -9,7 +9,16 @@ import { Redis } from "./deps.ts";
 /// neighbours. Buckets shard the active set so it never becomes a global scan.
 
 export const SESSION_TTL_SECONDS = 3 * 60 * 60;
+/// Fallback capture radius for a legacy session with no radius recorded, and the
+/// safety cap so a bad center config can't outrun the geo-bucket coverage.
 export const MATCH_RADIUS_METERS = 200;
+export const MAX_RADIUS_METERS = 5000;
+/// Regular (home) sittings anchor on the preceptor's GPS with this tight radius:
+/// small enough not to swallow a neighbouring sitting, large enough that phone
+/// GPS error doesn't stop people in the same room from joining.
+export const DEFAULT_REGULAR_RADIUS_METERS = 30;
+
+export type SessionType = "satsang" | "regular";
 
 export interface SessionMeta {
   id: string;
@@ -23,6 +32,11 @@ export interface SessionMeta {
   status: "collecting" | "meditating" | "ended";
   shortCode: string;
   frozen: boolean;
+  /// satsang (at a center, center-anchored) vs regular (home, GPS-anchored).
+  type: SessionType;
+  /// The distance (metres) within which an abhyasi joins this session. Set at
+  /// start from the center's radius (satsang) or the regular default.
+  matchRadiusMeters: number;
 }
 
 const metaKey = (id: string) => `sess:${id}`;
@@ -136,9 +150,10 @@ export class Buffer {
       if (now - Date.parse(m.startAttendanceAt) > SESSION_TTL_SECONDS * 1000) {
         continue;
       }
-      if (
-        distanceMeters(lat, lng, m.latitude, m.longitude) <= MATCH_RADIUS_METERS
-      ) {
+      // Each session defines its own capture radius (a 2km satsang vs a 30m
+      // home sitting), so match against the session's radius, not a global one.
+      const radius = m.matchRadiusMeters || MATCH_RADIUS_METERS;
+      if (distanceMeters(lat, lng, m.latitude, m.longitude) <= radius) {
         out.push(m);
       }
     }

@@ -3,10 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
+import '../models/meditation_center.dart';
 import '../models/participant.dart';
 import '../services/attendance_service.dart';
+import '../services/centers/centers_service.dart';
+import '../services/centers/http_centers_service.dart';
+import '../services/centers/mock_centers_service.dart';
 import '../services/auth/auth_service.dart';
 import '../services/auth/auth_session.dart';
+import '../services/auth/dev_auth_service.dart';
 import '../services/auth/http_auth_api.dart';
 import '../services/auth/mock_auth_service.dart';
 import '../services/auth/supabase_auth_gateway_impl.dart';
@@ -46,6 +51,16 @@ final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
     baseUrl: AppConfig.apiBaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
     accessToken: () => ref.read(authServiceProvider).currentSession?.accessToken,
+    // DEV-ONLY: stamp the caller's Heartfulness ID into a header the backend
+    // trusts (when DEV_AUTH_SECRET is set). Empty for every non-dev build.
+    extraHeaders: () {
+      if (!AppConfig.devAuth) return const <String, String>{};
+      final hid = ref.read(authServiceProvider).devHeartfulnessId;
+      return {
+        'x-dev-secret': AppConfig.devAuthSecret,
+        if (hid != null) 'x-dev-hid': hid,
+      };
+    },
   );
 });
 
@@ -61,6 +76,21 @@ final attendanceServiceProvider = Provider<AttendanceService>((ref) {
     return HttpAttendanceService(ref.read(apiClientProvider));
   }
   return MockAttendanceService();
+});
+
+/// Registered centers a preceptor can hold a satsang at. Real list from the
+/// backend; seed data on the mock.
+final centersServiceProvider = Provider<CentersService>((ref) {
+  if (AppConfig.useRealBackend) {
+    return HttpCentersService(ref.read(apiClientProvider));
+  }
+  return MockCentersService();
+});
+
+/// The center list for the start-session picker. A FutureProvider because the
+/// real impl fetches it; the UI degrades to just the GPS option while loading.
+final centersProvider = FutureProvider<List<MeditationCenter>>((ref) {
+  return ref.read(centersServiceProvider).listCenters();
 });
 
 /// Read-only history of the member's own past sessions. Split from
@@ -126,6 +156,11 @@ final attendQueueProvider = Provider<AttendQueue>((ref) {
 /// Heartfulness SSO swap in here with no change to the screens, the same way
 /// the service providers above swap mock↔real.
 final Provider<AuthService> authServiceProvider = Provider<AuthService>((ref) {
+  // DEV-ONLY: one-step Heartfulness-ID sign-in against the real backend (no OTP,
+  // no email). Selected only when DEV_AUTH_SECRET is defined.
+  if (AppConfig.devAuth) {
+    return DevAuthService(ref.read(apiClientProvider));
+  }
   if (AppConfig.useRealBackend) {
     return SupabaseAuthService(
       HttpAuthApi(ref.read(apiClientProvider)),
