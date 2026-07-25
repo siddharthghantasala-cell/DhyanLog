@@ -137,6 +137,48 @@ export async function resolveMemberById(
   return { heartfulnessId: data.heartfulness_id, role: data.role };
 }
 
+/// Infer a placeholder's role from its Heartfulness ID. Ids follow the seed
+/// convention (HFN-PREC-xxx, HFN-ABHY-xxx), so a "...PREC..." id becomes a
+/// preceptor (can lead sessions) and anything else an abhyasi (attends). This
+/// is what lets an unknown tester "have meditation sessions" in either role
+/// without a separate toggle.
+export function placeholderRole(heartfulnessId: string): string {
+  return /prec/i.test(heartfulnessId) ? "preceptor" : "abhyasi";
+}
+
+/// DEV-ONLY: resolve the dev-auth member, creating a placeholder participant row
+/// if the id is unknown. An unknown id is deliberately let IN (under a generated
+/// name) so MVP testers don't need a pre-seeded account.
+///
+/// The placeholder must be a real row, not just synthesized in memory, because
+/// `meditation_sessions.preceptor_id` is a FK to `participants` and `auth/me`
+/// reads the row back. The upsert is idempotent, so a repeat login for the same
+/// id reuses the existing row. Only ever reached behind the DEV_AUTH_SECRET gate.
+export async function resolveOrCreateDevMember(
+  db: SupabaseClient,
+  heartfulnessId: string,
+): Promise<Member | null> {
+  const existing = await resolveMemberById(db, heartfulnessId);
+  if (existing) return existing;
+  const id = heartfulnessId.trim();
+  if (!id) return null;
+  const { data, error } = await db
+    .from("participants")
+    .upsert(
+      {
+        heartfulness_id: id,
+        name: `Guest ${id}`,
+        age: 0,
+        role: placeholderRole(id),
+      },
+      { onConflict: "heartfulness_id" },
+    )
+    .select("heartfulness_id,role")
+    .maybeSingle();
+  if (error || !data) return null;
+  return { heartfulnessId: data.heartfulness_id, role: data.role };
+}
+
 /// DEV-ONLY sign-in bypass. Returns the Heartfulness ID the caller claims via
 /// the `x-dev-hid` header — but ONLY when `DEV_AUTH_SECRET` is set on the
 /// function AND the request carries a matching `x-dev-secret` header. This

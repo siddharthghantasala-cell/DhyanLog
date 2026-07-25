@@ -11,7 +11,9 @@ import {
   isAuthenticated,
   type JwtClaims,
   type Member,
+  placeholderRole,
   requiredAuth,
+  resolveOrCreateDevMember,
 } from "./auth.ts";
 
 function makeJwt(payload: Record<string, unknown>): string {
@@ -89,6 +91,67 @@ Deno.test("authorize: leader requires a leading role", () => {
   assertEquals(authorize("leader", user, abhyasi).status, 403);
   assertEquals(authorize("leader", user, preceptor).ok, true);
   assertEquals(authorize("leader", user, master).ok, true);
+});
+
+Deno.test("placeholderRole: PREC ids lead, everything else attends", () => {
+  assertEquals(placeholderRole("HFN-PREC-999"), "preceptor");
+  assertEquals(placeholderRole("hfn-prec-042"), "preceptor"); // case-insensitive
+  assertEquals(placeholderRole("HFN-ABHY-999"), "abhyasi");
+  assertEquals(placeholderRole("random-guest"), "abhyasi");
+});
+
+/// Minimal fluent stand-in for the participants table: supports the
+/// select/ilike/maybeSingle read and the upsert/select/maybeSingle write that
+/// resolveOrCreateDevMember drives. Keyed case-insensitively, like the real ilike.
+function fakeDb(seed: Array<{ heartfulness_id: string; role: string }> = []) {
+  const rows = new Map<string, { heartfulness_id: string; role: string }>();
+  for (const r of seed) rows.set(r.heartfulness_id.toLowerCase(), r);
+  const builder = () => {
+    let pending: { heartfulness_id: string; role: string } | null = null;
+    const api: Record<string, unknown> = {
+      select: () => api,
+      ilike: (_col: string, val: string) => {
+        pending = rows.get(val.toLowerCase()) ?? null;
+        return api;
+      },
+      // deno-lint-ignore no-explicit-any
+      upsert: (row: any) => {
+        const stored = { heartfulness_id: row.heartfulness_id, role: row.role };
+        rows.set(row.heartfulness_id.toLowerCase(), stored);
+        pending = stored;
+        return api;
+      },
+      maybeSingle: () => Promise.resolve({ data: pending, error: null }),
+    };
+    return api;
+  };
+  return { from: builder, rows } as never;
+}
+
+Deno.test("resolveOrCreateDevMember: returns an existing member unchanged", async () => {
+  const db = fakeDb([{ heartfulness_id: "HFN-ABHY-001", role: "abhyasi" }]);
+  const m = await resolveOrCreateDevMember(db, "hfn-abhy-001"); // any case
+  assertEquals(m, { heartfulnessId: "HFN-ABHY-001", role: "abhyasi" });
+});
+
+Deno.test("resolveOrCreateDevMember: creates a placeholder for an unknown id", async () => {
+  const db = fakeDb();
+  const m = await resolveOrCreateDevMember(db, "HFN-PREC-777");
+  assertEquals(m, { heartfulnessId: "HFN-PREC-777", role: "preceptor" });
+  // Idempotent: a second login reuses the row rather than duplicating it.
+  const again = await resolveOrCreateDevMember(db, "HFN-PREC-777");
+  assertEquals(again, m);
+});
+
+Deno.test("resolveOrCreateDevMember: an unknown non-PREC id becomes an abhyasi", async () => {
+  const db = fakeDb();
+  const m = await resolveOrCreateDevMember(db, "curious-visitor");
+  assertEquals(m?.role, "abhyasi");
+});
+
+Deno.test("resolveOrCreateDevMember: a blank id is rejected", async () => {
+  const db = fakeDb();
+  assertEquals(await resolveOrCreateDevMember(db, "   "), null);
 });
 
 Deno.test("devAuthHeartfulnessId: inert unless DEV_AUTH_SECRET is set", () => {

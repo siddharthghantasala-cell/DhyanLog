@@ -11,7 +11,7 @@ import {
   type Member,
   requiredAuth,
   resolveMemberByEmail,
-  resolveMemberById,
+  resolveOrCreateDevMember,
 } from "./auth.ts";
 import { Buffer } from "./buffer.ts";
 import { listCenters } from "./centers.ts";
@@ -69,7 +69,8 @@ Deno.serve(async (req) => {
   // normal `authorize` path treats it as a real signed-in member.
   const devHid = level === "public" ? null : devAuthHeartfulnessId(req);
   if (devHid) {
-    member = await resolveMemberById(db(), devHid);
+    // Unknown id? Let them in anyway under a generated placeholder (MVP).
+    member = await resolveOrCreateDevMember(db(), devHid);
     if (member) {
       claims = {
         role: "authenticated",

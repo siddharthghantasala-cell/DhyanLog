@@ -59,3 +59,9 @@ build_apk_dev_mvp.ps1
 # Per-environment dart-define files (contain real keys). Only example.json is tracked.
 /config/*.json
 !/config/example.json
+
+# Real center/coordinator data (contains personal phone numbers). Never commit.
+Gachibowli Center Details for Siddhu - Gachibowli Subcenters.csv
+*Gachibowli Subcenters*.csv
+Gachibowli Center Details for Siddhu - Preceptor Details.csv
+*Preceptor Details*.csv
