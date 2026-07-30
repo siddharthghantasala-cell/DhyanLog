@@ -7,7 +7,7 @@ worldwide.
 
 A session leader (**preceptor**) starts an attendance window; attendees (**abhyasis**)
 mark attendance; the session then runs and ends. Participants are identified by their
-**Heartfulness ID** and sign in with a one-time passcode.
+**Heartfulness ID** — see **Auth & authorization** for how sign-in works.
 
 ## The one idea that shapes everything
 
@@ -63,25 +63,30 @@ Flutter app ─(AttendanceService / AuthService seams)─► Mock (no config)
 - **Swap point:** `lib/state/providers.dart` chooses the real backend when
   `SUPABASE_URL` + `SUPABASE_ANON_KEY` are provided, else the in-memory mock.
 
-## Security & auth
+## Auth & authorization
 
-- **Sign-in is two-step OTP**, fully server-side: the client sends a Heartfulness ID and
-  a code and never sees the member's email/phone — only a masked hint (`a***@domain`).
-  Behind the `AuthService` seam so **Heartfulness SSO** can swap in with no UI change.
-- **MVP dev login (opt-in, non-production):** with a `DEV_AUTH_SECRET` set on both the
-  function and the build, sign-in is a single step — just the Heartfulness ID, no OTP.
-  An **unknown ID is admitted under a generated placeholder** member (preceptor if the id
-  contains `PREC`, else abhyasi) so testers don't need a pre-seeded account. Gated by the
-  shared secret, so it is **inert in production** (no secret → normal OTP path only).
-- **Backend authorization** by route (public / member / leader), keyed off the
-  GoTrue-**verified `email` claim** (not user-writable metadata). Preceptors can only
-  manage their own sessions.
-- **Rate limiting** on the public OTP routes (per-ID + per-IP, Upstash counters).
+**How login works in the current MVP build:** a single **Heartfulness-ID** step, with
+**no proof of identity** (no OTP, no password). The app asks the backend whether the ID
+exists and signs in as that member; an **unknown ID is still admitted, under a generated
+placeholder** (preceptor if the id contains `PREC`, else abhyasi). This is intentional for
+closed MVP testing and is gated by `DEV_AUTH_SECRET` — the secret is shared between the
+build and the function, so anyone holding the build can sign in as any member. **Not for
+public/production.**
+
+- **Role authorization is still enforced**, MVP or not: every route requires
+  public / member / leader, resolved from the member's role in the database. Preceptors
+  can only manage their own sessions.
 - **RLS deny-all** on all tables; clients never touch Postgres directly (service-role
   edge function only). In-app **account deletion** (removes the login only).
 - Structured request logs + an **audit trail** for session lifecycle + account deletion.
 - Config/secrets via `--dart-define` (client) and function secrets (server); see
   `config/README.md`. CORS allowlist via `ALLOWED_ORIGINS`.
+
+**Production auth (built, but dormant for the MVP):** a two-step server-side **OTP** flow
+lives in the code — the client sends an ID and a code and never sees the member's
+email/phone (only a masked `a***@domain` hint), rate-limited per-ID + per-IP, behind the
+`AuthService` seam so **Heartfulness SSO** can swap in. It becomes the only way in once
+`DEV_AUTH_SECRET` is unset and the function redeployed.
 
 ## Data model (`supabase/migrations`)
 - `participants` — Heartfulness members (dummy/seed now; real internal DB later).
