@@ -64,8 +64,9 @@ event · 🟢 nice-to-have / post-launch.
   (`scripts/load-test/attend.js`). Watch the geo-bucket fan-out and the single
   meditation-stop flush; confirm free-tier limits hold or upgrade the Upstash /
   Supabase plans (subscription change, no re-architecting).
-- ☐ 🟢 Consider a collecting-phase checkpoint (cron) if a Redis loss *before*
-  end-attendance is a concern (currently members just re-attend).
+- ☐ 🟢 Consider a periodic session checkpoint (cron) if a mid-session Redis loss
+  is a concern (the merged flow no longer writes a checkpoint; currently members
+  just re-attend in a restarted session).
 
 ## 6. Legal / compliance / privacy
 

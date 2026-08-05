@@ -5,8 +5,9 @@ A meditation **attendance** app for the Heartfulness organization. It records
 sessions of 1–3 people to mass events of 40,000–70,000+ — happening continuously
 worldwide.
 
-A session leader (**preceptor**) starts an attendance window; attendees (**abhyasis**)
-mark attendance; the session then runs and ends. Participants are identified by their
+A session leader (**preceptor**) starts a session — attendance opens and the meditation
+begins in the same tap; attendees (**abhyasis**) mark attendance throughout (so latecomers
+still count); the preceptor ends it with one tap. Participants are identified by their
 **Heartfulness ID** — see **Auth & authorization** for how sign-in works.
 
 ## The one idea that shapes everything
@@ -18,8 +19,8 @@ entirely in a **hot buffer** (Redis) for its whole life; attendees are appended 
 exactly once**, writing a single row with the attendee list as an array + a count.
 
 ```
-collecting ──(abhyasis join, in Redis)──► meditating ──► STOP = single Postgres write
-   start attendance        give attendance       start            (the only write)
+START ──(meditating; abhyasis keep joining, in Redis)──► STOP = single Postgres write
+  attendance + meditation open together    latecomers OK      (the only write)
 ```
 
 So whether 3 or 70,000 people attend, it's one row, one write. Clients only ever
@@ -71,7 +72,8 @@ exists and signs in as that member; an **unknown ID is still admitted, under a g
 placeholder** (preceptor if the id contains `PREC`, else abhyasi). This is intentional for
 closed MVP testing and is gated by `DEV_AUTH_SECRET` — the secret is shared between the
 build and the function, so anyone holding the build can sign in as any member. **Not for
-public/production.**
+public/production** — every unsafe-by-design shortcut and launch blocker is listed in
+[`RED_FLAGS.md`](RED_FLAGS.md); read it before any public release.
 
 - **Role authorization is still enforced**, MVP or not: every route requires
   public / member / leader, resolved from the member's role in the database. Preceptors
@@ -97,8 +99,10 @@ email/phone (only a masked `a***@domain` hint), rate-limited per-ID + per-IP, be
 - `attendance_expanded` — normalized rows for analytics, built **off the hot path** by
   the monthly `expand_attendance()` job.
 - `audit_log` — session lifecycle + account-deletion actions (never per-attendee).
-- `session_checkpoints` — durability copy of the frozen attendee set so a mid-meditation
-  Redis loss can still be finalized.
+- `session_checkpoints` — durability table (schema + recovery path retained). Not written
+  in the current merged single-phase flow: with no separate freeze step, the live session
+  sits in the hot buffer (3h TTL) for its whole life and flushes once at stop. Re-enable
+  periodic checkpointing here if sessions could ever outlive the buffer TTL.
 
 ## Run it
 

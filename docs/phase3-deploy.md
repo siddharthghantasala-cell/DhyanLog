@@ -78,10 +78,11 @@ Run the app with the local URL/anon key printed by `supabase start`.
 ---
 
 ## Verify end-to-end
-1. Log in as `HFN-PREC-001`, Start Attendance → note the join code, count = 0.
+1. Log in as `HFN-PREC-001`, Start (attendance + meditation open together) → note
+   the join code, count = 0.
 2. From another browser/device, log in as `HFN-ABHY-001`, Give Attendance (GPS or code)
-   → the preceptor's count rises (poll-driven).
-3. End Attendance → Start Meditation → Stop Meditation.
+   → the preceptor's count rises (poll-driven). Attendance stays open the whole time.
+3. Stop Meditation (the single End action).
 4. Confirm **exactly one** row in `meditation_sessions` with the attendee array +
    count, and that the Redis keys for the session are gone.
 

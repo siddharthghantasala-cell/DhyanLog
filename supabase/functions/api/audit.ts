@@ -2,12 +2,12 @@ import { SupabaseClient } from "./deps.ts";
 
 /// Audited lifecycle actions. Deliberately excludes `attend`: attends happen
 /// per-attendee at mass-event scale and are never written individually (the
-/// whole architecture avoids that). The session actions are once-per-session;
-/// `account_delete` is a per-member action with no session (sessionId is null).
+/// whole architecture avoids that). The session actions are once-per-session
+/// (`session_start` and the single `meditation_stop` flush — the merged flow has
+/// no separate end-attendance/meditation-start steps); `account_delete` is a
+/// per-member action with no session (sessionId is null).
 export type AuditAction =
   | "session_start"
-  | "end_attendance"
-  | "meditation_start"
   | "meditation_stop"
   | "account_delete";
 

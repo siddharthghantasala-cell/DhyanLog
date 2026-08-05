@@ -8,11 +8,7 @@ import {
   type SessionType,
 } from "./buffer.ts";
 import { getCenter } from "./centers.ts";
-import {
-  deleteCheckpoint,
-  readCheckpoint,
-  writeCheckpoint,
-} from "./checkpoint.ts";
+import { deleteCheckpoint, readCheckpoint } from "./checkpoint.ts";
 import { json } from "./cors.ts";
 import { db } from "./db.ts";
 import {
@@ -61,26 +57,6 @@ async function audit(
         level: "error",
         msg: "audit_failed",
         action,
-        error: err,
-      }),
-    );
-  }
-}
-
-/// Write a durability checkpoint, best-effort: a failure here must not break the
-/// preceptor's action, so we log it and move on (the buffer is still the live
-/// source of truth; the checkpoint only matters if the buffer is later lost).
-async function checkpoint(
-  meta: SessionMeta,
-  attendees: string[],
-): Promise<void> {
-  const err = await writeCheckpoint(db(), meta, attendees);
-  if (err) {
-    console.error(
-      JSON.stringify({
-        level: "error",
-        msg: "checkpoint_failed",
-        session: meta.id,
         error: err,
       }),
     );
@@ -155,9 +131,12 @@ export async function startSession(
     latitude: anchorLat,
     longitude: anchorLng,
     startAttendanceAt: new Date().toISOString(),
-    meditationStartAt: null,
+    // Attendance opens and meditation begins together — a single "Start" action.
+    // The window stays open (status `meditating`) so latecomers still count,
+    // until the one meditation-stop flush.
+    meditationStartAt: new Date().toISOString(),
     meditationEndAt: null,
-    status: "collecting",
+    status: "meditating",
     shortCode: generateCode(),
     frozen: false,
     type,
@@ -181,7 +160,7 @@ export async function attend(
     if (!code) return json({ error: "invalid code" }, 400);
     const id = await buffer.resolveCode(code);
     const meta = id ? await buffer.getMeta(id) : null;
-    if (!meta || meta.frozen || meta.status !== "collecting") {
+    if (!meta || meta.status !== "meditating") {
       return json({ outcome: "notFound" });
     }
     return await joinAndRespond(buffer, meta, heartfulnessId);
@@ -214,61 +193,6 @@ async function joinAndRespond(
     outcome: added ? "joined" : "alreadyJoined",
     session: sessionDto(meta, count),
   });
-}
-
-/// Fetch the session and confirm the caller owns it, or return an error
-/// Response. Returns the live meta on success.
-async function ownedSession(
-  buffer: Buffer,
-  body: any,
-  member: Member,
-): Promise<SessionMeta | Response> {
-  const sessionId = cleanString(body.sessionId, 128);
-  if (!sessionId) return json({ error: "sessionId required" }, 400);
-  const meta = await buffer.getMeta(sessionId);
-  if (!meta) return json({ error: "session not active" }, 404);
-  if (!ownsSession(meta, member)) {
-    return json({ error: "not your session" }, 403);
-  }
-  return meta;
-}
-
-export async function endAttendance(
-  buffer: Buffer,
-  body: any,
-  member: Member,
-): Promise<Response> {
-  const meta = await ownedSession(buffer, body, member);
-  if (meta instanceof Response) return meta;
-  const updated: SessionMeta = { ...meta, frozen: true };
-  await buffer.putMeta(updated);
-  // The attendee set is now frozen — snapshot it to Postgres so a buffer loss
-  // during the meditation phase doesn't lose it. One SMEMBERS, once per session.
-  const attendees = await buffer.attendees(updated.id);
-  await checkpoint(updated, attendees);
-  await audit(member, "end_attendance", updated.id);
-  return json(sessionDto(updated, attendees.length));
-}
-
-export async function meditationStart(
-  buffer: Buffer,
-  body: any,
-  member: Member,
-): Promise<Response> {
-  const meta = await ownedSession(buffer, body, member);
-  if (meta instanceof Response) return meta;
-  const updated: SessionMeta = {
-    ...meta,
-    status: "meditating",
-    meditationStartAt: new Date().toISOString(),
-  };
-  await buffer.putMeta(updated);
-  // Refresh the checkpoint with the meditation-start time, right before the long
-  // meditation window where a buffer loss would be unrecoverable otherwise.
-  const attendees = await buffer.attendees(updated.id);
-  await checkpoint(updated, attendees);
-  await audit(member, "meditation_start", updated.id);
-  return json(sessionDto(updated, attendees.length));
 }
 
 /// The single flush: finalize, write ONE Postgres row, evict from the buffer.

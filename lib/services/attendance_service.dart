@@ -1,15 +1,19 @@
 import '../models/attend_result.dart';
 import '../models/meditation_session.dart';
 
-/// The session lifecycle API. Mirrors the planned Edge Function endpoints so the
-/// mock and the real HTTP implementation are interchangeable behind this type.
+/// The session lifecycle API. Mirrors the Edge Function endpoints so the mock
+/// and the real HTTP implementation are interchangeable behind this type.
 ///
-/// Lifecycle (all steps before [meditationStop] mutate only the hot buffer):
-///   start -> (abhyasis attend) -> endAttendance -> meditationStart -> meditationStop
-/// [meditationStop] is the single flush that persists one finalized session.
+/// Lifecycle (only two preceptor actions; everything before the stop mutates
+/// only the hot buffer):
+///   start -> (abhyasis attend, throughout) -> meditationStop
+/// A session is *meditating with attendance still open* from the moment it
+/// starts, so latecomers are counted for the whole meditation. [meditationStop]
+/// is the single flush that persists one finalized session and closes the door.
 abstract class AttendanceService {
-  /// Preceptor starts an attendance window. Creates the hot session + geo index
-  /// entry and returns it (with id, short code, QR payload).
+  /// Preceptor starts the session: attendance opens and meditation begins at the
+  /// same instant. Creates the hot session + geo index entry and returns it
+  /// (with id, short code, QR payload).
   Future<MeditationSession> startSession({
     required String preceptorId,
     String? centerId,
@@ -32,13 +36,6 @@ abstract class AttendanceService {
     required String heartfulnessId,
     required String codeOrSessionId,
   });
-
-  /// Freeze the attendee set (status collecting -> still collecting, no more
-  /// joins). Hot-buffer only; no DB write.
-  Future<MeditationSession> endAttendance(String sessionId);
-
-  /// Stamp meditation start. Hot-buffer only; no DB write.
-  Future<MeditationSession> meditationStart(String sessionId);
 
   /// Stamp meditation end and FLUSH: persist exactly one finalized session row,
   /// then evict from the hot buffer. Returns the finalized session.

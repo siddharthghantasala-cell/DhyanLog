@@ -9,7 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 class FakeMuteService implements NotificationMuteService {
   FakeMuteService({this.supported = true, this.permitted = true});
 
-  @override
   final bool supported;
   bool permitted;
 

@@ -135,7 +135,7 @@ export class Buffer {
     return await this.redis.get<string>(codeKey(code));
   }
 
-  /// Active, collecting, unfrozen sessions within range of a point.
+  /// Active (meditating, attendance-open) sessions within range of a point.
   async findNearby(lat: number, lng: number): Promise<SessionMeta[]> {
     const buckets = neighbourBuckets(lat, lng);
     const idLists = await Promise.all(
@@ -146,7 +146,7 @@ export class Buffer {
     const now = Date.now();
     const out: SessionMeta[] = [];
     for (const m of metas) {
-      if (!m || m.frozen || m.status !== "collecting") continue;
+      if (!m || m.status !== "meditating") continue;
       if (now - Date.parse(m.startAttendanceAt) > SESSION_TTL_SECONDS * 1000) {
         continue;
       }

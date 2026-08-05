@@ -12,10 +12,11 @@ import 'seed_data.dart';
 ///
 /// - [_hot]   : sessions still open (the buffer). Mutated freely, no "writes".
 /// - [_store] : finalized sessions (the single Postgres row per session).
-/// - [_frozen]: sessions whose attendee set is closed (after end-attendance).
 ///
-/// GPS matching mimics Redis `GEOSEARCH`: active, unfrozen, `collecting`
-/// sessions within [matchRadiusMeters] and the time window are candidates.
+/// A session is `meditating` (with attendance still open) for its whole life,
+/// then `ended` at the flush. GPS matching mimics Redis `GEOSEARCH`: active
+/// (`meditating`) sessions within [matchRadiusMeters] and the time window are
+/// candidates.
 class MockAttendanceService implements AttendanceService {
   MockAttendanceService({
     this.regularRadiusMeters = 30,
@@ -29,7 +30,6 @@ class MockAttendanceService implements AttendanceService {
 
   final Map<String, MeditationSession> _hot = {};
   final Map<String, MeditationSession> _store = {};
-  final Set<String> _frozen = {};
   final Map<String, StreamController<MeditationSession>> _controllers = {};
 
   /// Attendee identities per session — the stand-in for the Redis attendee set.
@@ -64,9 +64,10 @@ class MockAttendanceService implements AttendanceService {
       latitude: latitude,
       longitude: longitude,
       startAttendanceAt: DateTime.now(),
-      meditationStartAt: null,
+      // Attendance opens and meditation begins together — one "Start" action.
+      meditationStartAt: DateTime.now(),
       meditationEndAt: null,
-      status: SessionStatus.collecting,
+      status: SessionStatus.meditating,
       attendeeCount: 0,
       shortCode: _generateCode(),
       type: type,
@@ -86,8 +87,7 @@ class MockAttendanceService implements AttendanceService {
   }) async {
     final now = DateTime.now();
     final candidates = _hot.values.where((s) {
-      if (_frozen.contains(s.id)) return false;
-      if (s.status != SessionStatus.collecting) return false;
+      if (s.status != SessionStatus.meditating) return false;
       if (now.difference(s.startAttendanceAt) > matchWindow) return false;
       // Each session matches within its own radius (satsang vs regular).
       return distanceMeters(latitude, longitude, s.latitude, s.longitude) <=
@@ -113,8 +113,7 @@ class MockAttendanceService implements AttendanceService {
   }) async {
     final needle = codeOrSessionId.trim().toUpperCase();
     final match = _hot.values.where((s) {
-      if (_frozen.contains(s.id)) return false;
-      if (s.status != SessionStatus.collecting) return false;
+      if (s.status != SessionStatus.meditating) return false;
       return s.shortCode.toUpperCase() == needle ||
           s.id.toUpperCase() == needle;
     });
@@ -144,26 +143,6 @@ class MockAttendanceService implements AttendanceService {
   }
 
   @override
-  Future<MeditationSession> endAttendance(String sessionId) async {
-    final session = _requireHot(sessionId);
-    _frozen.add(sessionId);
-    _emit(session);
-    return session;
-  }
-
-  @override
-  Future<MeditationSession> meditationStart(String sessionId) async {
-    final session = _requireHot(sessionId);
-    final updated = session.copyWith(
-      meditationStartAt: DateTime.now(),
-      status: SessionStatus.meditating,
-    );
-    _hot[sessionId] = updated;
-    _emit(updated);
-    return updated;
-  }
-
-  @override
   Future<MeditationSession> meditationStop(String sessionId) async {
     final session = _requireHot(sessionId);
     // THE single flush: finalize, persist to the store, evict from the buffer.
@@ -173,7 +152,6 @@ class MockAttendanceService implements AttendanceService {
     );
     _store[sessionId] = finalized;
     _hot.remove(sessionId);
-    _frozen.remove(sessionId);
     // The attendee set is deliberately KEPT after the flush: it is the mock's
     // stand-in for the persisted `attendee_ids` column, which is what personal
     // history is queried from. (Redis evicts; Postgres doesn't.)

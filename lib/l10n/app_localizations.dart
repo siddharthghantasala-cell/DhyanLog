@@ -448,18 +448,6 @@ abstract class AppLocalizations {
   /// **'Meditating for {duration}'**
   String sessionMeditatingFor(String duration);
 
-  /// No description provided for @sessionEndAttendance.
-  ///
-  /// In en, this message translates to:
-  /// **'End Attendance'**
-  String get sessionEndAttendance;
-
-  /// No description provided for @sessionStartMeditation.
-  ///
-  /// In en, this message translates to:
-  /// **'Start Meditation'**
-  String get sessionStartMeditation;
-
   /// No description provided for @sessionStopMeditation.
   ///
   /// In en, this message translates to:

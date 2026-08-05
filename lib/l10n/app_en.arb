@@ -89,8 +89,6 @@
       "duration": { "type": "String" }
     }
   },
-  "sessionEndAttendance": "End Attendance",
-  "sessionStartMeditation": "Start Meditation",
   "sessionStopMeditation": "Stop Meditation",
   "sessionSavedTitle": "Session saved",
   "sessionSavedBody": "Finalized one record:\n• {count, plural, =1{1 attendee} other{{count} attendees}}\n• {minutes, plural, =1{1 min} other{{minutes} min}} meditation\n(written as a single row — the only DB write)",

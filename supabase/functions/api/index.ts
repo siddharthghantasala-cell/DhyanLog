@@ -21,9 +21,7 @@ import { logRequest } from "./log.ts";
 import {
   attend,
   deleteAccount,
-  endAttendance,
   getSession,
-  meditationStart,
   meditationStop,
   sessionHistory,
   startSession,
@@ -119,10 +117,6 @@ Deno.serve(async (req) => {
         return finish(await startSession(Buffer.fromEnv(), body, member!));
       case "attend":
         return finish(await attend(Buffer.fromEnv(), body, member!));
-      case "sessions/end-attendance":
-        return finish(await endAttendance(Buffer.fromEnv(), body, member!));
-      case "sessions/meditation-start":
-        return finish(await meditationStart(Buffer.fromEnv(), body, member!));
       case "sessions/meditation-stop":
         return finish(await meditationStop(Buffer.fromEnv(), body, member!));
       case "sessions/get":

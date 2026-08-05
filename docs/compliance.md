@@ -43,15 +43,16 @@ Pre-launch checklist for the official app. Items marked **(needs decision)** or
 The DB write is *not* the bottleneck — a 70k session is still one Postgres row
 (`attendee_ids` array + count). The mass-event risks are:
 
-- **Redis durability — checkpointed.** The open session lives in Upstash for its
-  ~1h life, but the frozen attendee set is now snapshotted to Postgres
-  (`session_checkpoints`) at end-attendance and meditation-start, and
-  `meditation-stop` recovers from that checkpoint if the buffer was evicted — so
-  a mid-meditation Redis loss no longer strands the in-flight set. Still review
-  Upstash persistence/eviction settings and set memory/eviction alerts. Residual
-  gap: a loss *during the collecting phase* (before end-attendance) isn't
-  checkpointed — affected members simply re-give attendance. A periodic
-  collecting-phase checkpoint (cron) could close that if needed.
+- **Redis durability — buffer TTL, checkpoint retained but dormant.** The merged
+  flow has a single phase: a session is *meditating with attendance open* for its
+  whole ~1h life in Upstash (3h key TTL) and flushes once at meditation-stop.
+  There is no longer a separate freeze step to snapshot, so `session_checkpoints`
+  is not written on the happy path (the schema + `meditation-stop` recovery read
+  are retained). A Redis loss mid-session therefore strands that session —
+  affected members simply re-give attendance in a restarted session. Review
+  Upstash persistence/eviction settings and set memory/eviction alerts; if
+  sessions could ever outlive the buffer TTL, add a periodic checkpoint (cron)
+  that snapshots the growing attendee set.
 - **Per-attend response amplification — FIXED.** `attend` used to return the
   entire growing attendee list on every call (SMEMBERS), ~O(n²) at scale. Clients
   now receive only `attendee_count` (Redis SCARD); the full id set is

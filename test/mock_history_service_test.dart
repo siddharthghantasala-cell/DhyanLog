@@ -21,8 +21,6 @@ Future<MeditationSession> runSession(
       codeOrSessionId: session.shortCode,
     );
   }
-  await service.endAttendance(session.id);
-  await service.meditationStart(session.id);
   return service.meditationStop(session.id);
 }
 

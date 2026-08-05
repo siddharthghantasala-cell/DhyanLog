@@ -31,10 +31,9 @@ void main() {
         expect(r.outcome, AttendOutcome.joined);
       }
 
-      await svc.endAttendance(session.id);
-      await svc.meditationStart(session.id);
-
-      // Still nothing written until the stop/flush.
+      // Still nothing written until the single stop/flush — the session is
+      // meditating with attendance open the whole time.
+      expect(session.status, SessionStatus.meditating);
       expect(svc.finalizedSessions, isEmpty);
 
       final done = await svc.meditationStop(session.id);
@@ -42,7 +41,7 @@ void main() {
       expect(svc.finalizedSessions.length, 1);
       expect(done.status, SessionStatus.ended);
       expect(done.attendeeCount, 3); // three distinct abhyasis, deduped
-      expect(done.meditationStartAt, isNotNull);
+      expect(done.meditationStartAt, isNotNull); // stamped at start
       expect(done.meditationEndAt, isNotNull);
     });
 
@@ -116,20 +115,30 @@ void main() {
       expect(r.outcome, AttendOutcome.notFound);
     });
 
-    test('attendance closes after End Attendance', () async {
+    test('attendance stays open until stop, then closes', () async {
       final svc = MockAttendanceService();
       final s = await svc.startSession(
         preceptorId: 'HFN-PREC-001',
         latitude: chennai.latitude,
         longitude: chennai.longitude,
       );
-      await svc.endAttendance(s.id);
-      final r = await svc.attendByLocation(
+      // A latecomer can still join while the meditation is running.
+      final during = await svc.attendByLocation(
         heartfulnessId: 'HFN-ABHY-001',
         latitude: chennai.latitude,
         longitude: chennai.longitude,
       );
-      expect(r.outcome, AttendOutcome.notFound);
+      expect(during.outcome, AttendOutcome.joined);
+
+      await svc.meditationStop(s.id);
+
+      // Once stopped and flushed, the session is gone from the buffer.
+      final after = await svc.attendByLocation(
+        heartfulnessId: 'HFN-ABHY-002',
+        latitude: chennai.latitude,
+        longitude: chennai.longitude,
+      );
+      expect(after.outcome, AttendOutcome.notFound);
     });
   });
 }

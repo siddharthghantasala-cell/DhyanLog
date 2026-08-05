@@ -215,12 +215,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get sessionEndAttendance => 'End Attendance';
-
-  @override
-  String get sessionStartMeditation => 'Start Meditation';
-
-  @override
   String get sessionStopMeditation => 'Stop Meditation';
 
   @override

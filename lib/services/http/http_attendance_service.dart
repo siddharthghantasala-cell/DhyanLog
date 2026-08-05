@@ -68,20 +68,6 @@ class HttpAttendanceService implements AttendanceService {
   }
 
   @override
-  Future<MeditationSession> endAttendance(String sessionId) async {
-    final res =
-        await _api.post('sessions/end-attendance', {'sessionId': sessionId});
-    return _session(res);
-  }
-
-  @override
-  Future<MeditationSession> meditationStart(String sessionId) async {
-    final res =
-        await _api.post('sessions/meditation-start', {'sessionId': sessionId});
-    return _session(res);
-  }
-
-  @override
   Future<MeditationSession> meditationStop(String sessionId) async {
     final res =
         await _api.post('sessions/meditation-stop', {'sessionId': sessionId});

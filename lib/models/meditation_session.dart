@@ -1,6 +1,9 @@
-/// The lifecycle status of a session. While `collecting` and `meditating`, the
-/// session lives entirely in the hot buffer (Redis in production, in-memory in
-/// the mock). Only on transition to `ended` is the single Postgres row written.
+/// The lifecycle status of a session. A live session is `meditating` (with
+/// attendance still open) for its whole life in the hot buffer (Redis in
+/// production, in-memory in the mock); only on transition to `ended` is the
+/// single Postgres row written. `collecting` predates the merged
+/// start-attendance/start-meditation flow and is retained only as the safe
+/// parse fallback for older payloads.
 enum SessionStatus {
   collecting,
   meditating,

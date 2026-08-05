@@ -10,8 +10,9 @@ import '../state/providers.dart';
 import 'error_presentation.dart';
 
 /// Live session control for the preceptor:
-///   collecting -> [End Attendance] -> [Start Meditation] -> [Stop Meditation]
-/// Stop is the single flush that finalizes the session.
+///   meditating (attendance open) -> [Stop Meditation]
+/// Attendance stays open for the whole meditation (latecomers still count), and
+/// the single Stop is the one flush that finalizes the session.
 class PreceptorSessionScreen extends ConsumerStatefulWidget {
   const PreceptorSessionScreen({super.key, required this.sessionId});
 
@@ -24,7 +25,6 @@ class PreceptorSessionScreen extends ConsumerStatefulWidget {
 
 class _PreceptorSessionScreenState
     extends ConsumerState<PreceptorSessionScreen> {
-  bool _attendanceClosed = false;
   bool _busy = false;
   Timer? _ticker;
 
@@ -141,55 +141,32 @@ class _PreceptorSessionScreenState
   ) {
     final id = widget.sessionId;
     final l10n = AppLocalizations.of(context)!;
-    switch (session.status) {
-      case SessionStatus.collecting:
-        if (!_attendanceClosed) {
-          return [
-            FilledButton.icon(
-              onPressed: _busy
-                  ? null
-                  : () => _run(() async {
-                        await service.endAttendance(id);
-                        if (mounted) setState(() => _attendanceClosed = true);
-                      }),
-              icon: const Icon(Icons.lock_clock),
-              label: Text(l10n.sessionEndAttendance),
-            ),
-          ];
-        }
-        return [
-          FilledButton.icon(
-            onPressed:
-                _busy ? null : () => _run(() => service.meditationStart(id)),
-            icon: const Icon(Icons.play_arrow),
-            label: Text(l10n.sessionStartMeditation),
-          ),
-        ];
-      case SessionStatus.meditating:
-        return [
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            onPressed: _busy
-                ? null
-                : () => _run(() async {
-                      final done = await service.meditationStop(id);
-                      if (!mounted) return;
-                      _showSummary(done);
-                    }),
-            icon: const Icon(Icons.stop),
-            label: Text(l10n.sessionStopMeditation),
-          ),
-        ];
-      case SessionStatus.ended:
-        return [
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n.commonDone),
-          ),
-        ];
+    if (session.status == SessionStatus.ended) {
+      return [
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.commonDone),
+        ),
+      ];
     }
+    // Live session: attendance is open and meditation is running. One action
+    // ends both and flushes the single finalized record.
+    return [
+      FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+        onPressed: _busy
+            ? null
+            : () => _run(() async {
+                  final done = await service.meditationStop(id);
+                  if (!mounted) return;
+                  _showSummary(done);
+                }),
+        icon: const Icon(Icons.stop),
+        label: Text(l10n.sessionStopMeditation),
+      ),
+    ];
   }
 
   void _showSummary(MeditationSession s) {
