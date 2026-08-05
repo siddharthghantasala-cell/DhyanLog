@@ -341,3 +341,53 @@ export async function getSession(buffer: Buffer, body: any): Promise<Response> {
   if (!data) return json({ error: "not found" }, 404);
   return json(data);
 }
+
+/// The most attendees a live session lists by name to its preceptor. Above this
+/// (a mass gathering) the roster is withheld — count only. Streaming a growing
+/// id/name list to any client is exactly what the architecture avoids.
+const ATTENDEE_ROSTER_CAP = 200;
+
+/// The preceptor's live view of *who* has checked in to their own session — the
+/// one place a client is shown identities rather than a bare count. Deliberately
+/// bounded: owner-scoped (leader + ownsSession) and only while the set is small.
+/// `count` comes from the O(1) SCARD; only under the cap do we SMEMBERS + resolve
+/// names, so a mass gathering never pulls the whole set. `sessions/get` stays
+/// count-only for everyone, so no unbounded list ever reaches a client.
+export async function sessionRoster(
+  buffer: Buffer,
+  body: any,
+  member: Member,
+): Promise<Response> {
+  const sessionId = cleanString(body.sessionId, 128);
+  if (!sessionId) return json({ error: "sessionId required" }, 400);
+  const meta = await buffer.getMeta(sessionId);
+  if (!meta) return json({ error: "session not active" }, 404);
+  if (!ownsSession(meta, member)) {
+    return json({ error: "not your session" }, 403);
+  }
+
+  const count = await buffer.count(sessionId);
+  // Withhold the list for a mass gathering — count only, no SMEMBERS.
+  if (count === 0 || count > ATTENDEE_ROSTER_CAP) {
+    return json({ count, names: [], capped: count > ATTENDEE_ROSTER_CAP });
+  }
+
+  const ids = await buffer.attendees(sessionId);
+  const { data, error } = await db()
+    .from("participants")
+    .select("heartfulness_id,name")
+    .in("heartfulness_id", ids);
+  if (error) return json({ error: error.message }, 500);
+
+  const nameById = new Map<string, string>(
+    (data ?? []).map((r: { heartfulness_id: string; name: string }) => [
+      r.heartfulness_id,
+      r.name,
+    ]),
+  );
+  // Fall back to the id if a name is somehow missing; sort for a stable display.
+  const names = ids
+    .map((id) => nameById.get(id) ?? id)
+    .sort((a, b) => a.localeCompare(b));
+  return json({ count, names, capped: false });
+}

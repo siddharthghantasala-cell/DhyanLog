@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_localizations.dart';
+import '../models/attendee_roster.dart';
 import '../models/meditation_session.dart';
 import '../state/providers.dart';
 import 'error_presentation.dart';
@@ -26,7 +27,14 @@ class PreceptorSessionScreen extends ConsumerStatefulWidget {
 class _PreceptorSessionScreenState
     extends ConsumerState<PreceptorSessionScreen> {
   bool _busy = false;
+  bool _ended = false;
   Timer? _ticker;
+  Timer? _rosterTimer;
+
+  /// Names of who has checked in, refreshed on its own light poll (separate from
+  /// the session stream). Best-effort: a failed roster poll never breaks the
+  /// screen — the authoritative count still comes from the session stream.
+  AttendeeRoster _roster = AttendeeRoster.empty;
 
   /// The live session stream, created once (not on every ticker rebuild) so the
   /// poll loop isn't torn down and recreated each second.
@@ -41,6 +49,22 @@ class _PreceptorSessionScreenState
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
+    // Names climb as people join; poll a little less often than the ticker.
+    _refreshRoster();
+    _rosterTimer =
+        Timer.periodic(const Duration(seconds: 2), (_) => _refreshRoster());
+  }
+
+  Future<void> _refreshRoster() async {
+    if (_ended) return;
+    try {
+      final roster = await ref
+          .read(attendanceServiceProvider)
+          .sessionRoster(widget.sessionId);
+      if (mounted && !_ended) setState(() => _roster = roster);
+    } catch (_) {
+      // Best-effort: the names list is a nice-to-have, never worth an error.
+    }
   }
 
   void _resubscribe() {
@@ -53,6 +77,7 @@ class _PreceptorSessionScreenState
   @override
   void dispose() {
     _ticker?.cancel();
+    _rosterTimer?.cancel();
     super.dispose();
   }
 
@@ -120,10 +145,12 @@ class _PreceptorSessionScreenState
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   if (session.status != SessionStatus.ended)
                     _JoinInfo(code: session.shortCode, qr: session.qrPayload),
-                  const Spacer(),
+                  const SizedBox(height: 16),
+                  Expanded(child: _AttendeeList(roster: _roster)),
+                  const SizedBox(height: 16),
                   ..._actions(context, service, session),
                 ],
               ),
@@ -160,6 +187,8 @@ class _PreceptorSessionScreenState
             ? null
             : () => _run(() async {
                   final done = await service.meditationStop(id);
+                  _ended = true;
+                  _rosterTimer?.cancel();
                   if (!mounted) return;
                   _showSummary(done);
                 }),
@@ -195,6 +224,61 @@ class _PreceptorSessionScreenState
     final m = d.inMinutes;
     final s = (d.inSeconds % 60).toString().padLeft(2, '0');
     return '$m:$s';
+  }
+}
+
+/// The live list of who has checked in, for the preceptor. Shows names while the
+/// session is small enough; for a mass gathering ([AttendeeRoster.capped]) it
+/// shows only a note (the count is displayed above).
+class _AttendeeList extends StatelessWidget {
+  const _AttendeeList({required this.roster});
+
+  final AttendeeRoster roster;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodyMedium?.copyWith(
+      color: theme.colorScheme.outline,
+    );
+
+    if (roster.capped) {
+      return Center(
+        child: Text(l10n.sessionRosterCapped,
+            textAlign: TextAlign.center, style: muted),
+      );
+    }
+    if (roster.names.isEmpty) {
+      return Center(
+        child: Text(l10n.sessionNoAttendeesYet,
+            textAlign: TextAlign.center, style: muted),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(l10n.sessionCheckedInTitle,
+              style: theme.textTheme.titleSmall),
+        ),
+        const SizedBox(height: 4),
+        Expanded(
+          child: ListView.builder(
+            itemCount: roster.names.length,
+            itemBuilder: (context, i) => ListTile(
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.check_circle,
+                  size: 18, color: theme.colorScheme.primary),
+              title: Text(roster.names[i]),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

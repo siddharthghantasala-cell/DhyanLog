@@ -83,6 +83,9 @@
 
   "sessionTitle": "Session",
   "sessionAttendees": "Attendees",
+  "sessionCheckedInTitle": "Checked in",
+  "sessionNoAttendeesYet": "No one has checked in yet",
+  "sessionRosterCapped": "Large gathering — showing the count only",
   "sessionMeditatingFor": "Meditating for {duration}",
   "@sessionMeditatingFor": {
     "placeholders": {

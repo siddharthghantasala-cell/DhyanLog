@@ -24,6 +24,7 @@ import {
   getSession,
   meditationStop,
   sessionHistory,
+  sessionRoster,
   startSession,
 } from "./handlers.ts";
 import { me, requestOtp, verifyOtp } from "./otp.ts";
@@ -121,6 +122,8 @@ Deno.serve(async (req) => {
         return finish(await meditationStop(Buffer.fromEnv(), body, member!));
       case "sessions/get":
         return finish(await getSession(Buffer.fromEnv(), body));
+      case "sessions/attendees":
+        return finish(await sessionRoster(Buffer.fromEnv(), body, member!));
       case "centers/list":
         return finish(await listCenters());
       case "sessions/history":

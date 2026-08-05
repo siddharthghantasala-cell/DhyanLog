@@ -70,6 +70,7 @@ export function requiredAuth(route: string): AuthLevel {
     case "auth/verify-otp":
       return "public";
     case "sessions/start":
+    case "sessions/attendees":
     case "sessions/meditation-stop":
       return "leader";
     case "auth/me":

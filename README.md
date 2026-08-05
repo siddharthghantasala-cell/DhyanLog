@@ -25,6 +25,10 @@ START ──(meditating; abhyasis keep joining, in Redis)──► STOP = single
 
 So whether 3 or 70,000 people attend, it's one row, one write. Clients only ever
 receive the running **count**, never the id list (which would be O(n²) at scale).
+The one deliberate exception: a preceptor can see the **names** of who has checked
+in to *their own* live session — but that roster is owner-scoped and **bounded**
+(names only below a server cap; a mass gathering falls back to count-only), so no
+client is ever streamed a growing, unbounded identity list.
 
 ## Sessions: satsang vs regular
 

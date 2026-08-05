@@ -99,6 +99,52 @@ void main() {
       expect(byCode.session!.id, b.id);
     });
 
+    test('roster lists checked-in names (sorted) for a small session',
+        () async {
+      final svc = MockAttendanceService();
+      final s = await svc.startSession(
+        preceptorId: 'HFN-PREC-001',
+        centerId: chennai.id,
+        latitude: chennai.latitude,
+        longitude: chennai.longitude,
+      );
+      for (final id in ['HFN-ABHY-002', 'HFN-ABHY-001']) {
+        await svc.attendByLocation(
+          heartfulnessId: id,
+          latitude: chennai.latitude,
+          longitude: chennai.longitude,
+        );
+      }
+
+      final roster = await svc.sessionRoster(s.id);
+      expect(roster.capped, isFalse);
+      expect(roster.count, 2);
+      // Meera Nair (ABHY-001) + Carlos Mendez (ABHY-002), alphabetized.
+      expect(roster.names, ['Carlos Mendez', 'Meera Nair']);
+    });
+
+    test('roster withholds names above the cap (count only)', () async {
+      final svc = MockAttendanceService(rosterCap: 1);
+      final s = await svc.startSession(
+        preceptorId: 'HFN-PREC-001',
+        centerId: chennai.id,
+        latitude: chennai.latitude,
+        longitude: chennai.longitude,
+      );
+      for (final id in ['HFN-ABHY-001', 'HFN-ABHY-002']) {
+        await svc.attendByLocation(
+          heartfulnessId: id,
+          latitude: chennai.latitude,
+          longitude: chennai.longitude,
+        );
+      }
+
+      final roster = await svc.sessionRoster(s.id);
+      expect(roster.capped, isTrue);
+      expect(roster.count, 2);
+      expect(roster.names, isEmpty);
+    });
+
     test('out-of-range attendance is not found', () async {
       final svc = MockAttendanceService();
       await svc.startSession(

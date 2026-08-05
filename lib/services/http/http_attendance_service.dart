@@ -1,4 +1,5 @@
 import '../../models/attend_result.dart';
+import '../../models/attendee_roster.dart';
 import '../../models/meditation_session.dart';
 import '../attendance_service.dart';
 import 'api_client.dart';
@@ -87,6 +88,16 @@ class HttpAttendanceService implements AttendanceService {
       if (e.statusCode == 404) return null;
       rethrow;
     }
+  }
+
+  @override
+  Future<AttendeeRoster> sessionRoster(String sessionId) async {
+    final res = await _api.post(
+      'sessions/attendees',
+      {'sessionId': sessionId},
+      retryable: true, // read-only
+    );
+    return AttendeeRoster.fromJson(res);
   }
 
   @override

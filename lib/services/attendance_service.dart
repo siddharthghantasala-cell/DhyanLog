@@ -1,4 +1,5 @@
 import '../models/attend_result.dart';
+import '../models/attendee_roster.dart';
 import '../models/meditation_session.dart';
 
 /// The session lifecycle API. Mirrors the Edge Function endpoints so the mock
@@ -43,6 +44,14 @@ abstract class AttendanceService {
 
   /// Current snapshot of a session (from hot buffer while open, else store).
   Future<MeditationSession?> getSession(String sessionId);
+
+  /// The names of attendees who have checked in to a live session, for the
+  /// preceptor leading it. The *only* path that shows a client identities rather
+  /// than a bare count — and deliberately bounded: only the owning leader may
+  /// call it, and only a session below the server's roster cap returns names (a
+  /// mass gathering returns the count with [AttendeeRoster.capped] set). Never
+  /// streams an unbounded list, so the one-write / count-only scaling rule holds.
+  Future<AttendeeRoster> sessionRoster(String sessionId);
 
   /// Live updates for the preceptor screen (attendee count climbing, status
   /// changes). Backed by Realtime/polling in production.

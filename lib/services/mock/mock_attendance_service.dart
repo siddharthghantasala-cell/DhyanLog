@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import '../../models/attend_result.dart';
+import '../../models/attendee_roster.dart';
 import '../../models/meditation_center.dart';
 import '../../models/meditation_session.dart';
 import '../../util/geo.dart';
@@ -21,12 +22,23 @@ class MockAttendanceService implements AttendanceService {
   MockAttendanceService({
     this.regularRadiusMeters = 30,
     this.matchWindow = const Duration(hours: 3),
+    this.rosterCap = 200,
   });
 
   /// Default capture radius for a regular (home) session — mirrors the backend's
   /// DEFAULT_REGULAR_RADIUS_METERS. A satsang uses its center's radius instead.
   final double regularRadiusMeters;
   final Duration matchWindow;
+
+  /// Most attendees [sessionRoster] will list by name before withholding the
+  /// list (count only) — mirrors the backend's ATTENDEE_ROSTER_CAP.
+  final int rosterCap;
+
+  /// Heartfulness id -> display name, the stand-in for the participants lookup
+  /// the backend does when resolving a roster.
+  late final Map<String, String> _namesById = {
+    for (final p in SeedData.participants) p.heartfulnessId.toUpperCase(): p.name,
+  };
 
   final Map<String, MeditationSession> _hot = {};
   final Map<String, MeditationSession> _store = {};
@@ -164,6 +176,19 @@ class MockAttendanceService implements AttendanceService {
   @override
   Future<MeditationSession?> getSession(String sessionId) async {
     return _hot[sessionId] ?? _store[sessionId];
+  }
+
+  @override
+  Future<AttendeeRoster> sessionRoster(String sessionId) async {
+    final ids = _attendees[sessionId] ?? const <String>{};
+    final count = ids.length;
+    // Above the cap (a mass gathering) the list is withheld — count only.
+    if (count > rosterCap) {
+      return AttendeeRoster(count: count, names: const [], capped: true);
+    }
+    final names = ids.map((id) => _namesById[id.toUpperCase()] ?? id).toList()
+      ..sort();
+    return AttendeeRoster(count: count, names: names, capped: false);
   }
 
   @override

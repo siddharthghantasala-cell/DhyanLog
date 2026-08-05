@@ -210,6 +210,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sessionAttendees => 'Attendees';
 
   @override
+  String get sessionCheckedInTitle => 'Checked in';
+
+  @override
+  String get sessionNoAttendeesYet => 'No one has checked in yet';
+
+  @override
+  String get sessionRosterCapped => 'Large gathering — showing the count only';
+
+  @override
   String sessionMeditatingFor(String duration) {
     return 'Meditating for $duration';
   }

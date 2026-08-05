@@ -442,6 +442,24 @@ abstract class AppLocalizations {
   /// **'Attendees'**
   String get sessionAttendees;
 
+  /// No description provided for @sessionCheckedInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked in'**
+  String get sessionCheckedInTitle;
+
+  /// No description provided for @sessionNoAttendeesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No one has checked in yet'**
+  String get sessionNoAttendeesYet;
+
+  /// No description provided for @sessionRosterCapped.
+  ///
+  /// In en, this message translates to:
+  /// **'Large gathering — showing the count only'**
+  String get sessionRosterCapped;
+
   /// No description provided for @sessionMeditatingFor.
   ///
   /// In en, this message translates to:
