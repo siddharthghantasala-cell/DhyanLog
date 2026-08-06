@@ -51,6 +51,7 @@ build_apk_for_phone.ps1
 # MVP dev-auth helpers + secret (bypass login; never commit)
 run_dev_mvp.ps1
 build_apk_dev_mvp.ps1
+build_appbundle_playstore.ps1
 .dev_auth_secret.txt
 
 # Contains the Supabase personal access token
