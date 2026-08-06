@@ -135,6 +135,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (!AppConfig.useRealBackend) ...[
+                    _TestModeBanner(scheme: scheme),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
                   Icon(Icons.self_improvement, size: 96, color: scheme.primary),
                   const SizedBox(height: AppSpacing.md),
                   Text(
@@ -278,6 +282,49 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         child: Text(l10n.loginUseDifferentId),
       ),
     ];
+  }
+}
+
+/// Unmissable warning that this build isn't talking to the real Heartfulness
+/// database — shown whenever [AppConfig.useRealBackend] is false, which
+/// happens silently if a release build ships without the SUPABASE_URL/
+/// SUPABASE_ANON_KEY dart-defines. Surfaced here (not just as a login error)
+/// because that silent fallback has shipped to Play Store internal testing
+/// more than once.
+class _TestModeBanner extends StatelessWidget {
+  const _TestModeBanner({required this.scheme});
+
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: scheme.onErrorContainer),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              'TEST MODE — not connected to the real Heartfulness database. '
+              'Any sign-in here uses fake local data only.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onErrorContainer,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
