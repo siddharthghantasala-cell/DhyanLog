@@ -152,13 +152,32 @@ final attendQueueProvider = Provider<AttendQueue>((ref) {
   );
 });
 
-/// Authentication seam. Mock identity now; Supabase Auth (interim) then
-/// Heartfulness SSO swap in here with no change to the screens, the same way
-/// the service providers above swap mock↔real.
+/// Which sign-in flow the app presents. Reads [AppConfig.authMode], which is
+/// compile-time; a provider so widget tests can exercise either flow without
+/// rebuilding with a different --dart-define.
+enum SignInMode { id, otp }
+
+final signInModeProvider = Provider<SignInMode>((ref) {
+  return AppConfig.useIdSignIn ? SignInMode.id : SignInMode.otp;
+});
+
+/// False when the build cannot sign anyone in — id sign-in without the key it
+/// needs. The app shows an explicit "this build can't sign in" screen instead of
+/// a login form that is guaranteed to fail. A provider for the same reason as
+/// [signInModeProvider]: tests inject their own auth and are always configured.
+final signInConfiguredProvider = Provider<bool>((ref) {
+  return AppConfig.isSignInConfigured;
+});
+
+/// Authentication seam. One-step Heartfulness-ID sign-in today; the OTP
+/// providers below stay wired for the move to verified identity, and Heartfulness
+/// SSO swaps in here with no change to the screens — the same way the service
+/// providers above swap mock↔real.
 final Provider<AuthService> authServiceProvider = Provider<AuthService>((ref) {
-  // DEV-ONLY: one-step Heartfulness-ID sign-in against the real backend (no OTP,
-  // no email). Selected only when DEV_AUTH_SECRET is defined.
-  if (AppConfig.devAuth) {
+  // One-step Heartfulness-ID sign-in against the real backend (no OTP, no
+  // email): the only flow a normal build ships. Needs DEV_AUTH_SECRET, which
+  // AppConfig.isSignInConfigured checks for at startup.
+  if (ref.watch(signInModeProvider) == SignInMode.id && AppConfig.devAuth) {
     return DevAuthService(ref.read(apiClientProvider));
   }
   if (AppConfig.useRealBackend) {

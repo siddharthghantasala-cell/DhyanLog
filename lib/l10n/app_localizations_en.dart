@@ -21,14 +21,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginIdHint => 'e.g. HFN-ABHY-001';
 
   @override
+  String get loginSignIn => 'Sign in';
+
+  @override
   String get loginSendCode => 'Send code';
 
   @override
   String get loginEnterId => 'Enter your Heartfulness ID';
 
   @override
+  String get loginIdHelp =>
+      'Sign in with the Heartfulness ID on your membership record.';
+
+  @override
   String get loginHelp =>
       'We send a one-time code to the email or phone on your Heartfulness record. Try a seeded ID such as HFN-PREC-001 (preceptor) or HFN-ABHY-001 (abhyasi).';
+
+  @override
+  String get loginNotConfiguredTitle => 'This build can\'t sign in';
+
+  @override
+  String get loginNotConfiguredBody =>
+      'It was built without its sign-in key. Rebuild with build_appbundle_playstore.ps1 (or pass --dart-define-from-file=config/dev.json) and install that build instead.';
 
   @override
   String loginCodeSentTo(String destination) {

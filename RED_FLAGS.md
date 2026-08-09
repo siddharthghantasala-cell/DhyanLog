@@ -16,17 +16,23 @@ The client build ships a shared `DEV_AUTH_SECRET` that the edge function trusts:
 it takes the caller's Heartfulness ID straight from a header and synthesizes an
 authenticated session. **Whoever holds the build can impersonate any member.**
 - Gated by the `DEV_AUTH_SECRET` function secret — **inert when unset**
-  (`lib/config/app_config.dart`: `devAuth => devAuthSecret.isNotEmpty && useRealBackend`;
-  `supabase/functions/api/index.ts` dev branch).
+  (`lib/config/app_config.dart`: `devAuth`; `supabase/functions/api/index.ts` dev branch).
+- The secret is kept **out of this repo** (gitignored `config/dev.json` + build scripts)
+  precisely because the repo is public: committing it would widen impersonation from
+  "whoever holds the build" to anyone on the internet. The Supabase URL and anon key
+  *are* committed — the anon key is public by design.
 - **Before production:** `supabase secrets unset DEV_AUTH_SECRET` **and redeploy `api`**,
   then confirm a dev-auth header no longer logs anyone in.
 
 ### 2. No real proof of identity in the MVP
 Login is a single **Heartfulness-ID** step — no OTP, no password. The backend only
-checks that the ID exists and signs in as that member.
+checks that the ID exists and signs in as that member. This is now the *only* flow a
+normal build presents (`AUTH_MODE` defaults to `id`).
 - The production **OTP flow is built but dormant** (behind the `AuthService` seam,
-  ready for Heartfulness SSO). It becomes the only way in once dev-auth is unset (#1).
-- **Before production:** turn on OTP/SSO; verify the ID-existence path is gone.
+  ready for Heartfulness SSO). Reachable with `--dart-define=AUTH_MODE=otp`, and
+  covered by a widget test so it doesn't rot.
+- **Before production:** build with `AUTH_MODE=otp` (or wire SSO), unset dev-auth
+  (#1), and verify the ID-existence path is gone.
 
 ### 3. Unknown IDs are admitted under a placeholder
 An unknown ID is let in anyway, creating a real `participants` row (`Guest <id>`,
@@ -82,7 +88,7 @@ free-tier limits hold under a mass-event load test (subscription bump, no re-arc
 ## ✅ Pre-production gate (quick checklist)
 - [ ] `supabase secrets unset DEV_AUTH_SECRET` + redeploy `api` (#1)
 - [ ] Verify no dev-auth login and no placeholder admission after unset (#1, #3)
-- [ ] OTP / SSO is the live sign-in path (#2)
+- [ ] OTP / SSO is the live sign-in path — build with `AUTH_MODE=otp` (#2)
 - [ ] Real Android upload keystore + `release` signing + version bump (#4)
 - [ ] No PII in git; real venue coordinates/radii seeded (#5, #6)
 - [ ] Decide on session durability for scale (#7)

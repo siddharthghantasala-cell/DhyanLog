@@ -1,6 +1,8 @@
 {
   "SUPABASE_URL": "https://YOUR-REF.supabase.co",
   "SUPABASE_ANON_KEY": "YOUR-ANON-KEY",
+  "DEV_AUTH_SECRET": "MATCHES-THE-BACKENDS-DEV_AUTH_SECRET",
+  "AUTH_MODE": "id",
   "SENTRY_DSN": "",
   "APP_ENV": "dev"
 }

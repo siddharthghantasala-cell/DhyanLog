@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../config/app_config.dart';
 import '../l10n/app_localizations.dart';
 import '../services/auth/auth_service.dart';
 import '../state/providers.dart';
 import '../theme/tokens.dart';
 
-/// Two-step sign-in: enter Heartfulness ID -> receive a one-time code at the
-/// contact on file -> verify. No matching member means no entry.
+/// Sign-in. [SignInMode.id] — what every build ships — is a single step: enter
+/// your Heartfulness ID and you're in, so any member of the organization can use
+/// the app with the ID they already have. [SignInMode.otp] is the dormant
+/// two-step flow (ID -> one-time code at the contact on file -> verify) kept
+/// wired for the move to verified identity. Either way, no matching member means
+/// no entry.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -33,8 +36,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  /// DEV one-step sign-in: just the Heartfulness ID, no code.
-  Future<void> _devSignIn() async {
+  /// One-step sign-in: just the Heartfulness ID, no code.
+  Future<void> _signInWithId() async {
     final l10n = AppLocalizations.of(context)!;
     final id = _idController.text.trim();
     if (id.isEmpty) {
@@ -135,10 +138,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (!AppConfig.useRealBackend) ...[
-                    _TestModeBanner(scheme: scheme),
-                    const SizedBox(height: AppSpacing.lg),
-                  ],
                   Icon(Icons.self_improvement, size: 96, color: scheme.primary),
                   const SizedBox(height: AppSpacing.md),
                   Text(
@@ -155,8 +154,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
-                  if (AppConfig.devAuth)
-                    ..._buildDevStep(context, l10n)
+                  if (ref.watch(signInModeProvider) == SignInMode.id)
+                    ..._buildIdSignIn(context, l10n)
                   else if (!onChallenge)
                     ..._buildIdStep(context, l10n)
                   else
@@ -170,36 +169,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  /// DEV MVP sign-in: a single Heartfulness-ID field, no OTP step.
-  List<Widget> _buildDevStep(BuildContext context, AppLocalizations l10n) {
+  /// The shipping sign-in: a single Heartfulness-ID field, no code step. Any
+  /// member of the organization signs in with the ID they already have.
+  List<Widget> _buildIdSignIn(BuildContext context, AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     return [
-      Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.xs,
-        ),
-        decoration: BoxDecoration(
-          color: scheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          'MVP mode — sign in with your Heartfulness ID',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSecondaryContainer,
-              ),
-        ),
-      ),
-      const SizedBox(height: AppSpacing.lg),
       TextField(
         controller: _idController,
         textInputAction: TextInputAction.go,
         autocorrect: false,
-        onSubmitted: (_) => _devSignIn(),
+        onSubmitted: (_) => _signInWithId(),
         decoration: InputDecoration(
           labelText: l10n.loginIdLabel,
-          hintText: 'HFN-ABHY-001',
+          hintText: l10n.loginIdHint,
           border: const OutlineInputBorder(),
           errorText: _error,
           prefixIcon: const Icon(Icons.badge_outlined),
@@ -207,8 +189,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
       const SizedBox(height: AppSpacing.lg),
       FilledButton(
-        onPressed: _loading ? null : _devSignIn,
-        child: _loading ? const _Spinner() : Text(l10n.loginVerify),
+        onPressed: _loading ? null : _signInWithId,
+        child: _loading ? const _Spinner() : Text(l10n.loginSignIn),
+      ),
+      const SizedBox(height: AppSpacing.sm),
+      Text(
+        l10n.loginIdHelp,
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
       ),
     ];
   }
@@ -282,49 +272,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         child: Text(l10n.loginUseDifferentId),
       ),
     ];
-  }
-}
-
-/// Unmissable warning that this build isn't talking to the real Heartfulness
-/// database — shown whenever [AppConfig.useRealBackend] is false, which
-/// happens silently if a release build ships without the SUPABASE_URL/
-/// SUPABASE_ANON_KEY dart-defines. Surfaced here (not just as a login error)
-/// because that silent fallback has shipped to Play Store internal testing
-/// more than once.
-class _TestModeBanner extends StatelessWidget {
-  const _TestModeBanner({required this.scheme});
-
-  final ColorScheme scheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.warning_amber_rounded, color: scheme.onErrorContainer),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: Text(
-              'TEST MODE — not connected to the real Heartfulness database. '
-              'Any sign-in here uses fake local data only.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onErrorContainer,
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

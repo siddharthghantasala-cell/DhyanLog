@@ -118,6 +118,12 @@ abstract class AppLocalizations {
   /// **'e.g. HFN-ABHY-001'**
   String get loginIdHint;
 
+  /// No description provided for @loginSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get loginSignIn;
+
   /// No description provided for @loginSendCode.
   ///
   /// In en, this message translates to:
@@ -130,11 +136,29 @@ abstract class AppLocalizations {
   /// **'Enter your Heartfulness ID'**
   String get loginEnterId;
 
+  /// No description provided for @loginIdHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with the Heartfulness ID on your membership record.'**
+  String get loginIdHelp;
+
   /// No description provided for @loginHelp.
   ///
   /// In en, this message translates to:
   /// **'We send a one-time code to the email or phone on your Heartfulness record. Try a seeded ID such as HFN-PREC-001 (preceptor) or HFN-ABHY-001 (abhyasi).'**
   String get loginHelp;
+
+  /// No description provided for @loginNotConfiguredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This build can\'t sign in'**
+  String get loginNotConfiguredTitle;
+
+  /// No description provided for @loginNotConfiguredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It was built without its sign-in key. Rebuild with build_appbundle_playstore.ps1 (or pass --dart-define-from-file=config/dev.json) and install that build instead.'**
+  String get loginNotConfiguredBody;
 
   /// No description provided for @loginCodeSentTo.
   ///

@@ -6,10 +6,12 @@ import 'auth_service.dart';
 import 'auth_session.dart';
 import 'contact_mask.dart';
 
-/// In-memory [AuthService] for local dev: it runs the real two-step OTP shape
-/// but doesn't actually send or check a code — any 6-digit code verifies. Issues
-/// sessions with no token (the mock backend doesn't check one). State lives only
-/// in memory, so a restart signs the user out (`restoreSession` returns null).
+/// In-memory [AuthService] for local dev and widget tests. It mirrors both
+/// shipped shapes — one-step sign-in by Heartfulness ID, and the two-step OTP
+/// flow, which runs its real shape but doesn't send or check a code (any 6-digit
+/// code verifies). Issues sessions with no token (the mock backend doesn't check
+/// one). State lives only in memory, so a restart signs the user out
+/// (`restoreSession` returns null).
 class MockAuthService implements AuthService {
   MockAuthService(this._participants);
 
@@ -65,9 +67,24 @@ class MockAuthService implements AuthService {
     return session;
   }
 
+  /// The shipping flow's mock: resolve the member and issue a session, with no
+  /// code step. Mirrors [DevAuthService] against the seeded participants.
   @override
-  Future<AuthSession> signInWithId(String heartfulnessId) =>
-      throw const AuthException('Dev sign-in is not enabled.');
+  Future<AuthSession> signInWithId(String heartfulnessId) async {
+    final id = heartfulnessId.trim();
+    if (id.isEmpty) {
+      throw const AuthException('Enter your Heartfulness ID.');
+    }
+    final participant = await _participants.findByHeartfulnessId(id);
+    if (participant == null) {
+      throw AuthException('No Heartfulness member found for "$id".');
+    }
+    final session = AuthSession(participant: participant);
+    _pending = null;
+    _current = session;
+    _controller.add(session);
+    return session;
+  }
 
   @override
   String? get devHeartfulnessId => null;

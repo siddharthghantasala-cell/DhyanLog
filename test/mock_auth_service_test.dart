@@ -5,6 +5,33 @@ import 'package:dhyanlog/services/mock/mock_participant_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('MockAuthService one-step id sign-in', () {
+    late MockAuthService auth;
+
+    setUp(() => auth = MockAuthService(MockParticipantRepository()));
+
+    test('resolves the member and produces a session', () async {
+      final session = await auth.signInWithId('  hfn-abhy-001 ');
+      expect(session.participant.heartfulnessId, 'HFN-ABHY-001');
+      expect(auth.currentSession, isNotNull);
+    });
+
+    test('unknown ID is refused', () async {
+      await expectLater(
+        auth.signInWithId('HFN-NOPE-999'),
+        throwsA(isA<AuthException>()),
+      );
+      expect(auth.currentSession, isNull);
+    });
+
+    test('empty ID is refused', () async {
+      await expectLater(
+        auth.signInWithId('   '),
+        throwsA(isA<AuthException>()),
+      );
+    });
+  });
+
   group('MockAuthService OTP flow', () {
     late MockAuthService auth;
 

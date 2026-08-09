@@ -4,9 +4,13 @@
   "appTagline": "Meditation attendance",
   "loginIdLabel": "Heartfulness ID",
   "loginIdHint": "e.g. HFN-ABHY-001",
+  "loginSignIn": "Sign in",
   "loginSendCode": "Send code",
   "loginEnterId": "Enter your Heartfulness ID",
+  "loginIdHelp": "Sign in with the Heartfulness ID on your membership record.",
   "loginHelp": "We send a one-time code to the email or phone on your Heartfulness record. Try a seeded ID such as HFN-PREC-001 (preceptor) or HFN-ABHY-001 (abhyasi).",
+  "loginNotConfiguredTitle": "This build can't sign in",
+  "loginNotConfiguredBody": "It was built without its sign-in key. Rebuild with build_appbundle_playstore.ps1 (or pass --dart-define-from-file=config/dev.json) and install that build instead.",
   "loginCodeSentTo": "Enter the 6-digit code sent to {destination}.",
   "@loginCodeSentTo": {
     "placeholders": {
